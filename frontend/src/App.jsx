@@ -1,3 +1,5 @@
+import InvoiceResult from "./components/InvoiceResult";
+
 import { useState } from "react";
 
 function App() {
@@ -80,15 +82,7 @@ function App() {
         </p>
       )}
 
-      {result && (
-        <div>
-          <h2>Résultat</h2>
-
-          <pre>
-            {JSON.stringify(result, null, 2)}
-          </pre>
-        </div>
-      )}
+      {result && <InvoiceResult result={result} />}
     </div>
   );
 }
