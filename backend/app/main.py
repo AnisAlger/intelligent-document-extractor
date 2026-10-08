@@ -219,3 +219,31 @@ async def update_invoice_route(
         "message": "Facture modifiée avec succès",
         "id": invoice_id
     }
+
+@app.get("/dashboard")
+async def get_dashboard():
+    invoices = get_all_invoices()
+
+    total_invoices = len(invoices)
+
+    total_ht = sum(
+        invoice["invoice"].get("total_ht") or 0
+        for invoice in invoices
+    )
+
+    total_tax = sum(
+        invoice["invoice"].get("tax") or 0
+        for invoice in invoices
+    )
+
+    total_ttc = sum(
+        invoice["invoice"].get("total_ttc") or 0
+        for invoice in invoices
+    )
+
+    return {
+        "total_invoices": total_invoices,
+        "total_ht": total_ht,
+        "total_tax": total_tax,
+        "total_ttc": total_ttc
+    }
