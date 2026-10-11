@@ -1,34 +1,41 @@
+
 import { useEffect, useState } from "react";
+
+const API_URL = "http://127.0.0.1:8000";
 
 function InvoiceHistory() {
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedInvoice, setSelectedInvoice] = useState(null);
-  const [editing, setEditing] = useState(false);
-  const [editData, setEditData] = useState({});
+  const [editingInvoice, setEditingInvoice] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [exporting, setExporting] = useState("");
 
+  const formatAmount = (value) =>
+    Number(value ?? 0).toLocaleString("fr-FR", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+
+  // Charger l'historique des factures
   const loadInvoices = async () => {
     try {
       setLoading(true);
       setError("");
 
-      const response = await fetch(
-        "http://127.0.0.1:8000/invoices"
-      );
-
+      const response = await fetch(`${API_URL}/invoices`);
       const data = await response.json();
 
       if (!response.ok) {
         throw new Error(
-          data.detail || "Impossible de récupérer les factures."
+          data.detail || "Impossible de charger les factures."
         );
       }
 
-      setInvoices(data);
-    } catch (error) {
-      setError(error.message);
+      setInvoices(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setError(err.message || "Erreur de chargement.");
     } finally {
       setLoading(false);
     }
@@ -38,124 +45,119 @@ function InvoiceHistory() {
     loadInvoices();
   }, []);
 
-  const handleDeleteInvoice = async (invoiceId) => {
-  const confirmed = window.confirm(
-    "Êtes-vous sûr de vouloir supprimer cette facture ?"
-  );
-
-  if (!confirmed) {
-    return;
-  }
-
-  try {
-    setError("");
-
-    const response = await fetch(
-      `http://127.0.0.1:8000/invoices/${invoiceId}`,
-      {
-        method: "DELETE",
-      }
-    );
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(
-        data.detail || "Impossible de supprimer la facture."
-      );
-    }
-
-    // Fermer la fenêtre si la facture supprimée était ouverte
-    if (
-      selectedInvoice &&
-      selectedInvoice.id === invoiceId
-    ) {
-      setSelectedInvoice(null);
-    }
-
-    // Recharger l'historique
-    await loadInvoices();
-
-  } catch (error) {
-    setError(error.message);
-  }
-};
-
-  const handleViewInvoice = async (invoiceId) => {
+  // Exporter les factures en Excel ou PDF
+  const handleExport = async (format) => {
     try {
       setError("");
+      setExporting(format);
+
+      const endpoint = format === "excel" ? "excel" : "pdf";
 
       const response = await fetch(
-        `http://127.0.0.1:8000/invoices/${invoiceId}`
+        `${API_URL}/invoices/export/${endpoint}`
       );
 
-      const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(
-          data.detail || "Impossible de récupérer la facture."
-        );
+        let message = "Impossible d'exporter les factures.";
+
+        try {
+          const data = await response.json();
+          message = data.detail || message;
+        } catch {
+          // La réponse n'est pas nécessairement du JSON.
+        }
+
+        throw new Error(message);
       }
 
-      setSelectedInvoice(data);
-      setEditing(false);
-    } catch (error) {
-      setError(error.message);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+
+      link.href = url;
+      link.download =
+        format === "excel" ? "factures.xlsx" : "factures.pdf";
+
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+
+      window.setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+      }, 1000);
+    } catch (err) {
+      setError(err.message || "Erreur pendant l'exportation.");
+    } finally {
+      setExporting("");
     }
   };
 
-  const handleStartEditing = () => {
-    setEditData({
-      ...selectedInvoice.invoice,
+  // Afficher les détails d'une facture
+  const handleViewInvoice = (invoice) => {
+    setSelectedInvoice(invoice);
+    setEditingInvoice(null);
+  };
+
+  // Préparer la modification
+  const handleEditInvoice = (invoice) => {
+    setEditingInvoice({
+      ...invoice,
+      invoice: {
+        ...invoice.invoice,
+      },
     });
 
-    setEditing(true);
+    setSelectedInvoice(null);
   };
 
-  const handleEditChange = (field, value) => {
-    setEditData((previous) => ({
-      ...previous,
-      [field]: value,
-    }));
-  };
+  // Enregistrer les modifications
+  const handleSaveInvoice = async () => {
+    if (!editingInvoice) return;
 
-  const handleSave = async () => {
     try {
       setSaving(true);
       setError("");
 
-      const dataToSend = {
-        invoice_number: editData.invoice_number || null,
-        issue_date: editData.issue_date || null,
-        due_date: editData.due_date || null,
-        supplier: editData.supplier || null,
-        customer: editData.customer || null,
+      const fields = editingInvoice.invoice;
+
+      const payload = {
+        invoice_number: fields.invoice_number || null,
+        issue_date: fields.issue_date || null,
+        due_date: fields.due_date || null,
+        supplier: fields.supplier || null,
+        customer: fields.customer || null,
         total_ht:
-          editData.total_ht === "" ||
-          editData.total_ht === null
+          fields.total_ht === "" || fields.total_ht == null
             ? null
-            : Number(editData.total_ht),
+            : Number(fields.total_ht),
         tax:
-          editData.tax === "" ||
-          editData.tax === null
+          fields.tax === "" || fields.tax == null
             ? null
-            : Number(editData.tax),
+            : Number(fields.tax),
         total_ttc:
-          editData.total_ttc === "" ||
-          editData.total_ttc === null
+          fields.total_ttc === "" || fields.total_ttc == null
             ? null
-            : Number(editData.total_ttc),
-        currency: editData.currency || null,
+            : Number(fields.total_ttc),
+        currency: fields.currency || null,
       };
 
+      for (const field of ["total_ht", "tax", "total_ttc"]) {
+        if (
+          payload[field] !== null &&
+          !Number.isFinite(payload[field])
+        ) {
+          throw new Error(`Le champ ${field} doit être un nombre valide.`);
+        }
+      }
+
       const response = await fetch(
-        `http://127.0.0.1:8000/invoices/${selectedInvoice.id}`,
+        `${API_URL}/invoices/${editingInvoice.id}`,
         {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(dataToSend),
+          body: JSON.stringify(payload),
         }
       );
 
@@ -167,479 +169,283 @@ function InvoiceHistory() {
         );
       }
 
-      setSelectedInvoice({
-        ...selectedInvoice,
-        invoice: dataToSend,
-      });
-
-      setEditing(false);
-
+      setEditingInvoice(null);
       await loadInvoices();
-    } catch (error) {
-      setError(error.message);
+    } catch (err) {
+      setError(err.message || "Erreur pendant la modification.");
     } finally {
       setSaving(false);
     }
   };
 
-  const formatAmount = (value, currency) => {
-    if (value === null || value === undefined || value === "") {
-      return "—";
-    }
+  // Supprimer une facture
+  const handleDeleteInvoice = async (invoiceId) => {
+    const confirmed = window.confirm(
+      "Êtes-vous sûr de vouloir supprimer cette facture ?"
+    );
 
-    return `${Number(value).toLocaleString("fr-FR", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })} ${currency || ""}`;
+    if (!confirmed) return;
+
+    try {
+      setError("");
+
+      const response = await fetch(
+        `${API_URL}/invoices/${invoiceId}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.detail || "Impossible de supprimer la facture."
+        );
+      }
+
+      if (selectedInvoice?.id === invoiceId) {
+        setSelectedInvoice(null);
+      }
+
+      if (editingInvoice?.id === invoiceId) {
+        setEditingInvoice(null);
+      }
+
+      await loadInvoices();
+    } catch (err) {
+      setError(err.message || "Erreur pendant la suppression.");
+    }
+  };
+
+  // Mettre à jour un champ du formulaire de modification
+  const handleFieldChange = (field, value) => {
+    setEditingInvoice((previous) => ({
+      ...previous,
+      invoice: {
+        ...previous.invoice,
+        [field]: value,
+      },
+    }));
   };
 
   if (loading) {
     return (
       <div className="invoice-history">
-        <h2>Historique des factures</h2>
+        <h2>📋 Historique des factures</h2>
         <p>Chargement des factures...</p>
       </div>
     );
   }
 
-  if (error && !selectedInvoice) {
-    return (
-      <div className="invoice-history">
-        <h2>Historique des factures</h2>
-
-        <div className="error">
-          ❌ {error}
-        </div>
-
-        <button
-          className="extract-button"
-          onClick={loadInvoices}
-        >
-          Réessayer
-        </button>
-      </div>
-    );
-  }
-
   return (
-    <div className="invoice-history">
-
+    <section className="invoice-history">
       <div className="history-header">
         <div>
-          <h2>Historique des factures</h2>
-
-          <p>
-            {invoices.length} facture
-            {invoices.length > 1 ? "s" : ""} enregistrée
-            {invoices.length > 1 ? "s" : ""}
-          </p>
+          <h2>📋 Historique des factures</h2>
+          <p>Consultez et gérez les factures enregistrées.</p>
         </div>
 
         <button
-          className="refresh-button"
+          type="button"
           onClick={loadInvoices}
+          disabled={loading}
         >
           🔄 Actualiser
         </button>
       </div>
 
+      {error && (
+        <div className="error-box" role="alert">
+          ❌ {error}
+        </div>
+      )}
+
+      <div className="export-buttons">
+        <button
+          type="button"
+          className="export-excel-button"
+          onClick={() => handleExport("excel")}
+          disabled={Boolean(exporting)}
+        >
+          {exporting === "excel"
+            ? "⏳ Exportation..."
+            : "📊 Exporter Excel"}
+        </button>
+
+        <button
+          type="button"
+          className="export-pdf-button"
+          onClick={() => handleExport("pdf")}
+          disabled={Boolean(exporting)}
+        >
+          {exporting === "pdf"
+            ? "⏳ Exportation..."
+            : "📄 Exporter PDF"}
+        </button>
+      </div>
+
+      <p className="invoice-count">
+        {invoices.length} facture(s) enregistrée(s)
+      </p>
+
       {invoices.length === 0 ? (
         <div className="empty-history">
-          <div className="empty-icon">📄</div>
-
-          <h3>Aucune facture</h3>
-
-          <p>
-            Les factures que vous analyserez apparaîtront ici.
-          </p>
+          <p>📭 Aucune facture disponible.</p>
         </div>
       ) : (
-        <div className="invoice-table-container">
-
+        <div className="table-responsive">
           <table className="invoice-table">
-
             <thead>
               <tr>
-                <th>Facture</th>
+                <th>N° facture</th>
+                <th>Date</th>
                 <th>Fournisseur</th>
                 <th>Client</th>
-                <th>Date</th>
+                <th>Total HT</th>
+                <th>TVA</th>
                 <th>Total TTC</th>
-                <th>Fichier</th>
-                <th>Action</th>
+                <th>Actions</th>
               </tr>
             </thead>
 
             <tbody>
-
               {invoices.map((item) => {
-                const invoice = item.invoice;
+                const invoice = item.invoice || {};
 
                 return (
                   <tr key={item.id}>
-
                     <td>
-                      <strong>
-                        {invoice.invoice_number || "—"}
-                      </strong>
+                      {invoice.invoice_number || "Non renseigné"}
                     </td>
-
-                    <td>
-                      {invoice.supplier || "—"}
-                    </td>
-
-                    <td>
-                      {invoice.customer || "—"}
-                    </td>
-
-                    <td>
-                      {invoice.issue_date || "—"}
-                    </td>
-
-                    <td>
-                      {formatAmount(
-                        invoice.total_ttc,
-                        invoice.currency
-                      )}
-                    </td>
-
-                    <td>
-                      📄 {item.filename}
-                    </td>
+                    <td>{invoice.issue_date || "—"}</td>
+                    <td>{invoice.supplier || "—"}</td>
+                    <td>{invoice.customer || "—"}</td>
+                    <td>{formatAmount(invoice.total_ht)}</td>
+                    <td>{formatAmount(invoice.tax)}</td>
+                    <td>{formatAmount(invoice.total_ttc)}</td>
 
                     <td>
                       <div className="action-buttons">
+                        <button
+                          type="button"
+                          className="view-button"
+                          onClick={() => handleViewInvoice(item)}
+                        >
+                          👁️ Voir
+                        </button>
 
-  <button
-    className="view-button"
-    onClick={() =>
-      handleViewInvoice(item.id)
-    }
-  >
-    👁️ Voir
-  </button>
+                        <button
+                          type="button"
+                          className="edit-button"
+                          onClick={() => handleEditInvoice(item)}
+                        >
+                          ✏️ Modifier
+                        </button>
 
-  <button
-    className="delete-button"
-    onClick={() =>
-      handleDeleteInvoice(item.id)
-    }
-  >
-    🗑️
-  </button>
-
-</div>
+                        <button
+                          type="button"
+                          className="delete-button"
+                          onClick={() => handleDeleteInvoice(item.id)}
+                        >
+                          🗑️ Supprimer
+                        </button>
+                      </div>
                     </td>
-
                   </tr>
                 );
               })}
-
             </tbody>
-
           </table>
-
         </div>
       )}
 
+      {/* Fenêtre de consultation */}
       {selectedInvoice && (
-        <div
-          className="modal-overlay"
-          onClick={() => {
-            setSelectedInvoice(null);
-            setEditing(false);
-          }}
-        >
+        <div className="modal-overlay">
+          <div className="invoice-modal">
+            <h3>📄 Détails de la facture</h3>
 
-          <div
-            className="invoice-modal"
-            onClick={(event) =>
-              event.stopPropagation()
-            }
-          >
+            <p>
+              <strong>Fichier :</strong>{" "}
+              {selectedInvoice.filename || "—"}
+            </p>
 
-            <div className="modal-header">
-
-              <div>
-                <h2>
-                  Facture{" "}
-                  {selectedInvoice.invoice.invoice_number ||
-                    "—"}
-                </h2>
-
-                <p>
-                  {selectedInvoice.filename}
+            {Object.entries(selectedInvoice.invoice || {}).map(
+              ([key, value]) => (
+                <p key={key}>
+                  <strong>{key} :</strong>{" "}
+                  {value == null || value === "" ? "—" : String(value)}
                 </p>
-              </div>
+              )
+            )}
 
+            <button
+              type="button"
+              onClick={() => setSelectedInvoice(null)}
+            >
+              Fermer
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Fenêtre de modification */}
+      {editingInvoice && (
+        <div className="modal-overlay">
+          <div className="invoice-modal edit-modal">
+            <h3>✏️ Modifier la facture</h3>
+
+            <p className="edit-filename">
+              Fichier : {editingInvoice.filename || "—"}
+            </p>
+
+            {[
+              ["invoice_number", "Numéro de facture", "text"],
+              ["issue_date", "Date de facture", "text"],
+              ["due_date", "Date d'échéance", "text"],
+              ["supplier", "Fournisseur", "text"],
+              ["customer", "Client", "text"],
+              ["total_ht", "Total HT", "number"],
+              ["tax", "TVA", "number"],
+              ["total_ttc", "Total TTC", "number"],
+              ["currency", "Devise", "text"],
+            ].map(([field, label, type]) => (
+              <label className="edit-field" key={field}>
+                <span>{label}</span>
+
+                <input
+                  type={type}
+                  step={type === "number" ? "any" : undefined}
+                  value={editingInvoice.invoice[field] ?? ""}
+                  onChange={(event) =>
+                    handleFieldChange(field, event.target.value)
+                  }
+                />
+              </label>
+            ))}
+
+            <div className="modal-actions">
               <button
-                className="close-button"
-                onClick={() => {
-                  setSelectedInvoice(null);
-                  setEditing(false);
-                }}
+                type="button"
+                onClick={() => setEditingInvoice(null)}
+                disabled={saving}
               >
-                ✕
+                Annuler
               </button>
 
+              <button
+                type="button"
+                onClick={handleSaveInvoice}
+                disabled={saving}
+              >
+                {saving ? "Enregistrement..." : "💾 Enregistrer"}
+              </button>
             </div>
-
-            {error && (
-              <div className="error">
-                ❌ {error}
-              </div>
-            )}
-
-            {!editing ? (
-              <>
-                <div className="modal-grid">
-
-                  <div className="modal-item">
-                    <span>N° de facture</span>
-                    <strong>
-                      {selectedInvoice.invoice.invoice_number ||
-                        "—"}
-                    </strong>
-                  </div>
-
-                  <div className="modal-item">
-                    <span>Date d'émission</span>
-                    <strong>
-                      {selectedInvoice.invoice.issue_date ||
-                        "—"}
-                    </strong>
-                  </div>
-
-                  <div className="modal-item">
-                    <span>Date d'échéance</span>
-                    <strong>
-                      {selectedInvoice.invoice.due_date ||
-                        "—"}
-                    </strong>
-                  </div>
-
-                  <div className="modal-item">
-                    <span>Fournisseur</span>
-                    <strong>
-                      {selectedInvoice.invoice.supplier ||
-                        "—"}
-                    </strong>
-                  </div>
-
-                  <div className="modal-item">
-                    <span>Client</span>
-                    <strong>
-                      {selectedInvoice.invoice.customer ||
-                        "—"}
-                    </strong>
-                  </div>
-
-                  <div className="modal-item">
-                    <span>Total HT</span>
-                    <strong>
-                      {formatAmount(
-                        selectedInvoice.invoice.total_ht,
-                        selectedInvoice.invoice.currency
-                      )}
-                    </strong>
-                  </div>
-
-                  <div className="modal-item">
-                    <span>TVA</span>
-                    <strong>
-                      {formatAmount(
-                        selectedInvoice.invoice.tax,
-                        selectedInvoice.invoice.currency
-                      )}
-                    </strong>
-                  </div>
-
-                  <div className="modal-item">
-                    <span>Total TTC</span>
-                    <strong>
-                      {formatAmount(
-                        selectedInvoice.invoice.total_ttc,
-                        selectedInvoice.invoice.currency
-                      )}
-                    </strong>
-                  </div>
-
-                </div>
-
-                <div className="modal-actions">
-                  <button
-                    className="edit-button"
-                    onClick={handleStartEditing}
-                  >
-                    ✏️ Modifier
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="edit-form">
-
-                  <div className="form-group">
-                    <label>N° de facture</label>
-                    <input
-                      type="text"
-                      value={editData.invoice_number || ""}
-                      onChange={(event) =>
-                        handleEditChange(
-                          "invoice_number",
-                          event.target.value
-                        )
-                      }
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label>Date d'émission</label>
-                    <input
-                      type="text"
-                      value={editData.issue_date || ""}
-                      onChange={(event) =>
-                        handleEditChange(
-                          "issue_date",
-                          event.target.value
-                        )
-                      }
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label>Date d'échéance</label>
-                    <input
-                      type="text"
-                      value={editData.due_date || ""}
-                      onChange={(event) =>
-                        handleEditChange(
-                          "due_date",
-                          event.target.value
-                        )
-                      }
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label>Fournisseur</label>
-                    <input
-                      type="text"
-                      value={editData.supplier || ""}
-                      onChange={(event) =>
-                        handleEditChange(
-                          "supplier",
-                          event.target.value
-                        )
-                      }
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label>Client</label>
-                    <input
-                      type="text"
-                      value={editData.customer || ""}
-                      onChange={(event) =>
-                        handleEditChange(
-                          "customer",
-                          event.target.value
-                        )
-                      }
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label>Total HT</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={editData.total_ht ?? ""}
-                      onChange={(event) =>
-                        handleEditChange(
-                          "total_ht",
-                          event.target.value
-                        )
-                      }
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label>TVA</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={editData.tax ?? ""}
-                      onChange={(event) =>
-                        handleEditChange(
-                          "tax",
-                          event.target.value
-                        )
-                      }
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label>Total TTC</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={editData.total_ttc ?? ""}
-                      onChange={(event) =>
-                        handleEditChange(
-                          "total_ttc",
-                          event.target.value
-                        )
-                      }
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label>Devise</label>
-                    <input
-                      type="text"
-                      value={editData.currency || ""}
-                      onChange={(event) =>
-                        handleEditChange(
-                          "currency",
-                          event.target.value
-                        )
-                      }
-                    />
-                  </div>
-
-                </div>
-
-                <div className="modal-actions">
-
-                  <button
-                    className="cancel-button"
-                    onClick={() => setEditing(false)}
-                    disabled={saving}
-                  >
-                    Annuler
-                  </button>
-
-                  <button
-                    className="save-button"
-                    onClick={handleSave}
-                    disabled={saving}
-                  >
-                    {saving
-                      ? "Enregistrement..."
-                      : "💾 Enregistrer"}
-                  </button>
-
-                </div>
-              </>
-            )}
-
           </div>
-
         </div>
       )}
-
-    </div>
+    </section>
   );
 }
 

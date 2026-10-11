@@ -773,3 +773,36 @@
 .progress-step.completed small {
   color: #2563eb;
 }
+
+.export-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 20px 0;
+}
+
+.export-buttons button {
+  padding: 11px 18px;
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.export-excel-button {
+  background: #15803d;
+}
+
+.export-excel-button:hover {
+  background: #166534;
+}
+
+.export-pdf-button {
+  background: #dc2626;
+}
+
+.export-pdf-button:hover {
+  background: #b91c1c;
+}

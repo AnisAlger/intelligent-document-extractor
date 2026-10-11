@@ -3,6 +3,7 @@ from app.ocr import (
     extract_text_from_image,
     extract_text_from_pdf
 )
+from app.auth_routes import router as auth_router
 from pathlib import Path
 from app.ai_extractor import extract_invoice_data
 from app.database import (
@@ -14,6 +15,12 @@ from app.database import (
 )
 from app.models import InvoiceData
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
+from app.exports import (
+    export_invoices_to_excel,
+    export_invoices_to_pdf,
+)
+from app.face_verification import compare_identity_face
 import shutil
 
 app = FastAPI(
@@ -21,6 +28,7 @@ app = FastAPI(
     description="API for intelligent extraction of data from invoices",
     version="1.0.0"
 )
+app.include_router(auth_router)
 
 app.add_middleware(
     CORSMiddleware,
@@ -247,3 +255,110 @@ async def get_dashboard():
         "total_tax": total_tax,
         "total_ttc": total_ttc
     }
+
+@app.get("/invoices/export/excel")
+async def export_excel():
+    invoices = get_all_invoices()
+
+    file = export_invoices_to_excel(invoices)
+
+    return StreamingResponse(
+        file,
+        media_type=(
+            "application/vnd.openxmlformats-officedocument."
+            "spreadsheetml.sheet"
+        ),
+        headers={
+            "Content-Disposition":
+                'attachment; filename="factures.xlsx"'
+        },
+    )
+
+
+@app.get("/invoices/export/pdf")
+async def export_pdf():
+    invoices = get_all_invoices()
+
+    file = export_invoices_to_pdf(invoices)
+
+    return StreamingResponse(
+        file,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition":
+                'attachment; filename="factures.pdf"'
+        },
+    )
+
+
+# Taille maximale autorisée par image : 8 Mo
+MAX_ID_IMAGE_SIZE = 8 * 1024 * 1024
+
+
+@app.post("/verify-identity")
+async def verify_identity(
+    id_photo: UploadFile = File(...),
+    selfie: UploadFile = File(...),
+):
+    """
+    Compare le visage d'une carte d'identité avec un selfie.
+    Les photos ne sont ni sauvegardées sur disque ni stockées dans MongoDB.
+    """
+
+    allowed_types = {"image/jpeg", "image/png"}
+
+    for uploaded_file, label in [
+        (id_photo, "Photo de la carte d'identité"),
+        (selfie, "Selfie"),
+    ]:
+        if uploaded_file.content_type not in allowed_types:
+            raise HTTPException(
+                status_code=400,
+                detail=f"{label} : seuls les formats JPEG et PNG sont acceptés.",
+            )
+
+    try:
+        # Lecture limitée pour éviter de charger un fichier trop volumineux.
+        id_bytes = await id_photo.read(MAX_ID_IMAGE_SIZE + 1)
+        selfie_bytes = await selfie.read(MAX_ID_IMAGE_SIZE + 1)
+
+        if len(id_bytes) > MAX_ID_IMAGE_SIZE:
+            raise HTTPException(
+                status_code=413,
+                detail="La photo de la carte dépasse la limite de 8 Mo.",
+            )
+
+        if len(selfie_bytes) > MAX_ID_IMAGE_SIZE:
+            raise HTTPException(
+                status_code=413,
+                detail="Le selfie dépasse la limite de 8 Mo.",
+            )
+
+        result = compare_identity_face(
+            id_image_bytes=id_bytes,
+            selfie_image_bytes=selfie_bytes,
+        )
+
+        return {
+            "success": True,
+            "verification_type": "face_comparison",
+            **result,
+        }
+
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    except HTTPException:
+        raise
+
+    except Exception as exc:
+        # Détail conservé dans les logs serveur, sans l'exposer au client.
+        print(f"Erreur de vérification faciale : {exc}")
+        raise HTTPException(
+            status_code=500,
+            detail="Une erreur est survenue pendant la comparaison faciale.",
+        ) from exc
+
+    finally:
+        await id_photo.close()
+        await selfie.close()

@@ -90,3 +90,9 @@ def update_invoice(invoice_id: str, invoice_data: dict):
 
     except Exception:
         return False
+
+    # Collection des comptes utilisateurs
+users_collection = db["users"]
+
+# Chaque adresse email doit être unique
+users_collection.create_index("email", unique=True)

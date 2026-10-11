@@ -2,6 +2,7 @@ import { useState } from "react";
 import InvoiceResult from "./components/InvoiceResult";
 import InvoiceHistory from "./components/InvoiceHistory";
 import Dashboard from "./components/Dashboard";
+import IdentityVerification from "./components/IdentityVerification";
 import "./App.css";
 
 function App() {
