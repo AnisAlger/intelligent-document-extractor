@@ -3,7 +3,9 @@ from app.ocr import (
     extract_text_from_image,
     extract_text_from_pdf
 )
+from app.id_card_verification import verify_id_card_and_selfie
 from app.auth_routes import router as auth_router
+import tempfile
 from pathlib import Path
 from app.ai_extractor import extract_invoice_data
 from app.database import (
@@ -357,6 +359,59 @@ async def verify_identity(
         raise HTTPException(
             status_code=500,
             detail="Une erreur est survenue pendant la comparaison faciale.",
+        ) from exc
+
+    finally:
+        await id_photo.close()
+        await selfie.close()
+
+
+@ app.post("/verify-id-card")
+async def verify_id_card_endpoint(
+    id_photo: UploadFile = File(...),
+    selfie: UploadFile = File(...),
+):
+    allowed_types = {"image/jpeg", "image/png"}
+
+    if id_photo.content_type not in allowed_types:
+        raise HTTPException(
+            status_code=400,
+            detail="La photo de la carte doit être au format JPEG ou PNG.",
+        )
+
+    if selfie.content_type not in allowed_types:
+        raise HTTPException(
+            status_code=400,
+            detail="Le selfie doit être au format JPEG ou PNG.",
+        )
+
+    try:
+        id_bytes = await id_photo.read(8 * 1024 * 1024 + 1)
+        selfie_bytes = await selfie.read(8 * 1024 * 1024 + 1)
+
+        if len(id_bytes) > 8 * 1024 * 1024:
+            raise HTTPException(
+                status_code=413,
+                detail="La photo de la carte dépasse 8 Mo.",
+            )
+
+        if len(selfie_bytes) > 8 * 1024 * 1024:
+            raise HTTPException(
+                status_code=413,
+                detail="Le selfie dépasse 8 Mo.",
+            )
+
+        result = verify_id_card_and_selfie(
+            id_image_bytes=id_bytes,
+            selfie_bytes=selfie_bytes,
+        )
+
+        return result
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
         ) from exc
 
     finally:

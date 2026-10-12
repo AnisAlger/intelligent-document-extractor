@@ -96,3 +96,18 @@ users_collection = db["users"]
 
 # Chaque adresse email doit être unique
 users_collection.create_index("email", unique=True)
+
+
+def save_face_template(user_id: str, template: list[float]) -> bool:
+    """Enregistre le gabarit facial du compte utilisateur."""
+    from bson import ObjectId
+
+    if not ObjectId.is_valid(user_id):
+        return False
+
+    result = users_collection.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$set": {"face_template": template}},
+    )
+
+    return result.matched_count == 1

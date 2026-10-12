@@ -52,3 +52,39 @@ def extract_text_from_pdf(pdf_path: str) -> str:
         )
 
     return "\n\n".join(all_text)
+
+
+def extract_text_from_id_card(image_path: str) -> str:
+    """Prétraite une image de carte avant l'OCR."""
+
+    image = cv2.imread(image_path)
+
+    if image is None:
+        raise ValueError("Impossible de lire l'image de la carte.")
+
+    # Agrandir l'image pour améliorer la reconnaissance.
+    height, width = image.shape[:2]
+    image = cv2.resize(
+        image,
+        (width * 2, height * 2),
+        interpolation=cv2.INTER_CUBIC,
+    )
+
+    # Conversion en niveaux de gris.
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+    # Réduction du bruit et amélioration du contraste.
+    gray = cv2.bilateralFilter(gray, 9, 75, 75)
+    processed = cv2.createCLAHE(
+        clipLimit=2.0,
+        tileGridSize=(8, 8),
+    ).apply(gray)
+
+    # OCR français et anglais.
+    text = pytesseract.image_to_string(
+        processed,
+        lang="fra+eng",
+        config="--psm 6",
+    )
+
+    return text.strip()

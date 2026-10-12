@@ -150,3 +150,56 @@ def compare_identity_face(
             "est nécessaire avant toute décision."
         ),
     }
+
+
+def extract_face_template(image_bytes: bytes) -> list[float]:
+    """Extrait un gabarit facial numérique à partir d'une image."""
+    detector, recognizer = _load_models()
+    image = _decode_image(image_bytes)
+    face = _detect_one_face(image, detector)
+
+    aligned_face = recognizer.alignCrop(image, face)
+    features = recognizer.feature(aligned_face)
+
+    # Vérifier que le gabarit contient uniquement des valeurs finies.
+    template = features.flatten().astype(np.float32)
+
+    if not np.isfinite(template).all():
+        raise ValueError("Impossible de créer un gabarit facial valide.")
+
+    return template.tolist()
+
+
+def compare_face_to_template(
+    selfie_bytes: bytes,
+    stored_template: list[float],
+) -> dict:
+    """Compare un selfie avec un gabarit facial déjà enregistré."""
+    detector, recognizer = _load_models()
+    image = _decode_image(selfie_bytes)
+    face = _detect_one_face(image, detector)
+
+    aligned_face = recognizer.alignCrop(image, face)
+    features = recognizer.feature(aligned_face).flatten().astype(np.float32)
+
+    template = np.asarray(stored_template, dtype=np.float32).flatten()
+
+    if (
+        template.shape != features.shape
+        or not np.isfinite(template).all()
+        or not np.isfinite(features).all()
+    ):
+        raise ValueError("Le gabarit facial enregistré est invalide.")
+
+    score = recognizer.match(
+        features.reshape(1, -1),
+        template.reshape(1, -1),
+        cv2.FaceRecognizerSF_FR_COSINE,
+    )
+
+    return {
+        "comparison_score": round(float(score), 4),
+        "score_type": "cosine_similarity",
+        "automatic_decision": False,
+        "status": "review_required",
+    }
