@@ -1,7 +1,10 @@
 from datetime import datetime, timezone
-
+import os
+from typing import Literal
 import jwt
 from bson import ObjectId
+from bson.errors import InvalidId
+from pydantic import BaseModel, Field
 from fastapi import (
     APIRouter,
     Depends,
@@ -11,6 +14,7 @@ from fastapi import (
     UploadFile,
     Form
 )
+from app.id_card_verification import verify_id_card_and_selfie
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr, Field
 from pymongo.errors import DuplicateKeyError
@@ -18,7 +22,11 @@ from app.face_verification import (
     extract_face_template,
     compare_face_to_template,
 )
-
+from app.liveness_detection import (
+    analyze_blink_sequence,
+    analyze_head_movement_sequence,
+    select_best_face_frame,
+)
 from app.auth import (
     hash_password,
     verify_password,
@@ -82,6 +90,10 @@ class LoginRequest(BaseModel):
 
 class FaceLoginRequest(BaseModel):
     email: EmailStr
+
+class IdentityReviewRequest(BaseModel):
+    status: Literal["verified", "rejected"]
+    review_note: str = Field(default="", max_length=500)
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
@@ -215,7 +227,16 @@ async def enroll_face(
                 status_code=413,
                 detail="L'image dépasse la limite de 8 Mo.",
             )
+        identity_verification = user.get("identity_verification", {})
 
+        if identity_verification.get("status") != "verified":
+            raise HTTPException(
+                status_code=403,
+                detail=(
+                    "La vérification de l'identité doit être validée "
+                    "avant l'enregistrement du gabarit facial."
+                ),
+            )
         template = extract_face_template(image_bytes)
 
         result = users_collection.update_one(
@@ -247,6 +268,139 @@ async def enroll_face(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     finally:
         await selfie.close()
+async def require_admin(
+    user=Depends(get_authenticated_user),
+):
+    admin_emails = {
+        email.strip().lower()
+        for email in os.getenv("ADMIN_EMAILS", "").split(",")
+        if email.strip()
+    }
+
+    user_email = (user.get("email") or "").strip().lower()
+
+    if not admin_emails or user_email not in admin_emails:
+        raise HTTPException(
+            status_code=403,
+            detail="Accès réservé aux administrateurs.",
+        )
+
+    return user
+
+@router.patch("/admin/users/{user_id}/identity-review")
+async def review_identity(
+    user_id: str,
+    decision: IdentityReviewRequest,
+    admin=Depends(require_admin),
+):
+    try:
+        target_id = ObjectId(user_id)
+    except (InvalidId, TypeError):
+        raise HTTPException(
+            status_code=400,
+            detail="Identifiant utilisateur invalide.",
+        )
+
+    if target_id == admin["_id"]:
+        raise HTTPException(
+            status_code=403,
+            detail="Un administrateur ne peut pas valider sa propre identité.",
+        )
+
+    now = datetime.now(timezone.utc)
+
+    result = users_collection.update_one(
+        {
+            "_id": target_id,
+            "identity_verification.status": "review_required",
+        },
+        {
+            "$set": {
+                "identity_verification.status": decision.status,
+                "identity_verification.verified_at": (
+                    now if decision.status == "verified" else None
+                ),
+                "identity_verification.reviewed_at": now,
+                "identity_verification.reviewed_by": str(admin["_id"]),
+                "identity_verification.review_note": decision.review_note,
+            }
+        },
+    )
+
+    if result.matched_count == 0:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "Utilisateur introuvable ou vérification "
+                "non disponible pour examen."
+            ),
+        )
+
+    return {
+        "success": True,
+        "user_id": user_id,
+        "status": decision.status,
+        "message": (
+            "Identité validée."
+            if decision.status == "verified"
+            else "Identité rejetée."
+        ),
+    }
+
+
+@router.get("/admin/identity-reviews")
+def list_identity_reviews(
+    admin=Depends(require_admin),
+):
+    documents = users_collection.find(
+        {
+            "identity_verification.status": "review_required"
+        },
+        {
+            "email": 1,
+            "identity_verification": 1,
+            "created_at": 1,
+        },
+    ).sort(
+        "identity_verification.submitted_at", -1
+    ).limit(100)
+
+    items = []
+
+    for document in documents:
+        verification = document.get(
+            "identity_verification", {}
+        )
+        comparison = verification.get(
+            "face_comparison", {}
+        )
+
+        submitted_at = verification.get("submitted_at")
+
+        items.append({
+            "user_id": str(document["_id"]),
+            "email": document.get("email"),
+            "status": verification.get("status"),
+            "submitted_at": (
+                submitted_at.isoformat()
+                if submitted_at else None
+            ),
+            "id_card_checked": verification.get(
+                "id_card_checked", False
+            ),
+            "face_match_checked": verification.get(
+                "face_match_checked", False
+            ),
+            "comparison_score": comparison.get(
+                "comparison_score"
+            ),
+            "score_type": comparison.get("score_type"),
+        })
+
+    return {
+        "count": len(items),
+        "items": items,
+    }
 
 
 @router.post("/face/verify")
@@ -301,4 +455,252 @@ async def verify_face_login(
         ) from exc
 
     finally:
+        await selfie.close()
+
+
+
+@router.post("/face/verify-live")
+async def verify_face_live(
+    email: EmailStr = Form(...),
+    frames: list[UploadFile] = File(...),
+):
+    email_normalized = str(email).strip().lower()
+
+    if len(frames) < 5 or len(frames) > 30:
+        raise HTTPException(
+            status_code=400,
+            detail="Fournissez entre 5 et 30 images.",
+        )
+
+    frame_bytes = []
+
+    try:
+        total_size = 0
+
+        for frame in frames:
+            if frame.content_type not in {"image/jpeg", "image/png"}:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Toutes les images doivent être en JPEG ou PNG.",
+                )
+
+            content = await frame.read(8 * 1024 * 1024 + 1)
+
+            if len(content) > 8 * 1024 * 1024:
+                raise HTTPException(
+                    status_code=413,
+                    detail="Une image dépasse la limite de 8 Mo.",
+                )
+
+            total_size += len(content)
+
+            if total_size > 20 * 1024 * 1024:
+                raise HTTPException(
+                    status_code=413,
+                    detail="La séquence dépasse la limite de 20 Mo.",
+                )
+
+            frame_bytes.append(content)
+
+        # Contrôle 1 : clignement des yeux
+        blink_result = analyze_blink_sequence(frame_bytes)
+
+        # Contrôle 2 : mouvement horizontal de la tête
+        head_result = analyze_head_movement_sequence(frame_bytes)
+
+        blink_ok = (
+            blink_result.get("success") is True
+            and blink_result.get("blink_detected") is True
+        )
+
+        head_ok = (
+            head_result.get("success") is True
+            and head_result.get("head_movement_detected") is True
+        )
+
+        # Les deux contrôles doivent réussir avant la comparaison faciale.
+        if not (blink_ok and head_ok):
+            return {
+                "success": True,
+                "message": (
+                    "Les contrôles ne sont pas tous concluants. "
+                    "Recommencez la capture."
+                ),
+                "blink_check": blink_result,
+                "head_movement_check": head_result,
+                "face_comparison": None,
+                "authenticated": False,
+            }
+
+        # Recherche du compte et du gabarit facial enregistré.
+        user = users_collection.find_one(
+            {"email": email_normalized}
+        )
+
+        if not user or user.get("face_template") is None:
+            raise HTTPException(
+                status_code=401,
+                detail="Aucun gabarit facial enregistré pour ce compte.",
+            )
+
+        # Comparaison avec le gabarit enregistré.
+        # Attention : la dernière image peut ne pas être la meilleure.
+
+        # Sélectionner la meilleure image parmi toutes les captures.
+        selection = select_best_face_frame(frame_bytes)
+
+        if not selection["success"]:
+            return {
+                "success": True,
+                "message": (
+                    "Aucune image de qualité suffisante n'a été trouvée. "
+                    "Veuillez recommencer la capture."
+                ),
+                "blink_check": blink_result,
+                "head_movement_check": head_result,
+                "image_quality": {
+                    "success": False,
+                    "message": selection["message"],
+                    "evaluated_frames": selection["evaluated_frames"],
+                },
+                "face_comparison": None,
+                "authenticated": False,
+            }
+
+        best_frame = selection["selected_frame"]
+
+        # Comparer la meilleure image au gabarit enregistré.
+        comparison = compare_face_to_template(
+            best_frame,
+            user["face_template"],
+        )
+
+        return {
+            "success": True,
+            "message": (
+                "Les deux contrôles de mouvement ont réussi. "
+                "La décision d'authentification reste désactivée."
+            ),
+            "blink_check": blink_result,
+            "head_movement_check": head_result,
+            "image_quality": {
+                "success": True,
+                "evaluated_frames": selection["evaluated_frames"],
+                "selected_frame_index": selection["quality"]["frame_index"],
+                "metrics": {
+                    "sharpness": selection["quality"]["sharpness"],
+                    "face_area_ratio": selection["quality"]["face_area_ratio"],
+                    "brightness": selection["quality"]["brightness"],
+                    "quality_score": selection["quality"]["quality_score"],
+                },
+            },
+            "face_comparison": comparison,
+            "user_id": str(user["_id"]),
+            "authenticated": False,
+        }
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        ) from exc
+
+    finally:
+        for frame in frames:
+            await frame.close()
+
+
+@router.post("/verify-id-card")
+async def verify_identity_for_account(
+    id_photo: UploadFile = File(...),
+    selfie: UploadFile = File(...),
+    user=Depends(get_authenticated_user),
+):
+    allowed_types = {"image/jpeg", "image/png"}
+
+    if id_photo.content_type not in allowed_types:
+        raise HTTPException(
+            status_code=400,
+            detail="La carte doit être au format JPEG ou PNG.",
+        )
+
+    if selfie.content_type not in allowed_types:
+        raise HTTPException(
+            status_code=400,
+            detail="Le selfie doit être au format JPEG ou PNG.",
+        )
+
+    try:
+        id_bytes = await id_photo.read(8 * 1024 * 1024 + 1)
+        selfie_bytes = await selfie.read(8 * 1024 * 1024 + 1)
+
+        if len(id_bytes) > 8 * 1024 * 1024:
+            raise HTTPException(
+                status_code=413,
+                detail="La photo de la carte dépasse 8 Mo.",
+            )
+
+        if len(selfie_bytes) > 8 * 1024 * 1024:
+            raise HTTPException(
+                status_code=413,
+                detail="Le selfie dépasse 8 Mo.",
+            )
+
+        if not id_bytes or not selfie_bytes:
+            raise HTTPException(
+                status_code=400,
+                detail="La carte et le selfie sont obligatoires.",
+            )
+
+        # Effectuer l'analyse OCR et la comparaison des visages.
+        result = verify_id_card_and_selfie(
+            id_image_bytes=id_bytes,
+            selfie_bytes=selfie_bytes,
+        )
+
+        # Ne pas considérer automatiquement la carte comme vérifiée.
+        # Une validation fiable de l'identité reste nécessaire.
+        verification_record = {
+            "status": "review_required",
+            "id_card_checked": True,
+            "face_match_checked": (
+                result.get("face_comparison") is not None
+            ),
+            "verified_at": None,
+            "submitted_at": datetime.now(timezone.utc),
+            "face_comparison": result.get("face_comparison"),
+        }
+
+        users_collection.update_one(
+            {"_id": user["_id"]},
+            {
+                "$set": {
+                    "identity_verification": verification_record,
+                }
+            },
+        )
+
+        return {
+            "success": True,
+            "message": (
+                "Analyse terminée. L'identité doit encore être examinée."
+            ),
+            "identity_verification": {
+                "status": verification_record["status"],
+                "id_card_checked": verification_record["id_card_checked"],
+                "face_match_checked": verification_record[
+                    "face_match_checked"
+                ],
+            },
+            "analysis": result,
+        }
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        ) from exc
+
+    finally:
+        await id_photo.close()
         await selfie.close()

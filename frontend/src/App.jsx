@@ -1,387 +1,210 @@
-import { useState } from "react";
-import InvoiceResult from "./components/InvoiceResult";
-import InvoiceHistory from "./components/InvoiceHistory";
-import Dashboard from "./components/Dashboard";
-import IdentityVerification from "./components/IdentityVerification";
+import { useEffect, useRef, useState } from "react";
 import "./App.css";
 
+const API_URL = "http://127.0.0.1:8000";
+
 function App() {
-  const [activePage, setActivePage] = useState("dashboard");
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
 
-  const [file, setFile] = useState(null);
+  const [email, setEmail] = useState("");
+  const [cameraActive, setCameraActive] = useState(false);
+  const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState(null);
-  const [error, setError] = useState("");
-  const [extractionStep, setExtractionStep] = useState("");
 
-  const handleFileChange = (event) => {
-    setFile(event.target.files[0]);
-    setResult(null);
-    setError("");
-  };
+  useEffect(() => {
+    return () => {
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+    };
+  }, []);
 
-  const handleDragOver = (event) => {
-  event.preventDefault();
-  event.stopPropagation();
-};
+  async function startCamera() {
+    try {
+      setMessage("");
 
-const handleDrop = (event) => {
-  event.preventDefault();
-  event.stopPropagation();
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: "user",
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+        },
+        audio: false,
+      });
 
-  const droppedFile = event.dataTransfer.files[0];
+      streamRef.current = stream;
 
-  if (!droppedFile) {
-    return;
-  }
-
-  const allowedTypes = [
-    "application/pdf",
-    "image/png",
-    "image/jpeg",
-  ];
-
-  if (!allowedTypes.includes(droppedFile.type)) {
-    setError(
-      "Format non supporté. Utilisez PDF, PNG ou JPG."
-    );
-    return;
-  }
-
-  setFile(droppedFile);
-  setResult(null);
-  setError("");
-};
-
-  const handleExtract = async () => {
-  if (!file) {
-    setError("Veuillez sélectionner une facture.");
-    return;
-  }
-
-  setLoading(true);
-  setError("");
-  setResult(null);
-
-  try {
-    setExtractionStep("upload");
-
-    const formData = new FormData();
-    formData.append("file", file);
-
-    // Petite pause pour permettre à l'interface
-    // d'afficher l'étape Upload
-    await new Promise((resolve) =>
-      setTimeout(resolve, 500)
-    );
-
-    setExtractionStep("ocr");
-
-    const response = await fetch(
-      "http://127.0.0.1:8000/extract",
-      {
-        method: "POST",
-        body: formData,
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
       }
-    );
 
-    setExtractionStep("ai");
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(
-        data.detail || "Une erreur est survenue."
+      setCameraActive(true);
+      setMessage(
+        "Caméra active. Préparez-vous à cligner des yeux."
+      );
+    } catch (error) {
+      console.error(error);
+      setMessage(
+        "Impossible d'ouvrir la caméra. Vérifiez les permissions du navigateur."
       );
     }
+  }
 
-    setExtractionStep("database");
+  function stopCamera() {
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
 
-    await new Promise((resolve) =>
-      setTimeout(resolve, 500)
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+
+    setCameraActive(false);
+    setMessage("Caméra arrêtée.");
+  }
+
+  async function captureFrames() {
+    if (!email.trim()) {
+      setMessage("Saisissez l'adresse e-mail du compte.");
+      return;
+    }
+
+    if (!videoRef.current || !cameraActive) {
+      setMessage("Démarrez d'abord la caméra.");
+      return;
+    }
+
+    setLoading(true);
+    setMessage(
+      "Capture en cours : gardez votre visage devant la caméra et clignez naturellement des yeux..."
     );
 
-    setResult(data);
-    setExtractionStep("done");
+    try {
+      const video = videoRef.current;
+      const canvas = document.createElement("canvas");
+      const context = canvas.getContext("2d");
 
-  } catch (error) {
-    setError(error.message);
-    setExtractionStep("");
-  } finally {
-    setLoading(false);
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+
+      if (!canvas.width || !canvas.height) {
+        throw new Error("La caméra n'est pas encore prête.");
+      }
+
+      const frames = [];
+
+      // Capturer 15 images sur environ 3 secondes.
+      for (let i = 0; i < 15; i++) {
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        const blob = await new Promise((resolve) =>
+          canvas.toBlob(resolve, "image/jpeg", 0.85)
+        );
+
+        if (!blob) {
+          throw new Error("Impossible de capturer une image.");
+        }
+
+        frames.push(blob);
+
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      }
+
+      const formData = new FormData();
+
+      formData.append("email", email.trim());
+
+      frames.forEach((frame, index) => {
+        formData.append("frames", frame, `frame-${index + 1}.jpg`);
+      });
+
+      setMessage("Analyse du clignement et comparaison faciale...");
+
+      const response = await fetch(
+        `${API_URL}/auth/face/verify-live`,
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          typeof result.detail === "string"
+            ? result.detail
+            : "Erreur du serveur pendant la vérification."
+        );
+      }
+
+      setMessage(JSON.stringify(result, null, 2));
+    } catch (error) {
+      console.error(error);
+      setMessage(`Erreur : ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
   }
-};
-
-  const handleNewExtraction = () => {
-    setActivePage("extract");
-    setFile(null);
-    setResult(null);
-    setError("");
-  };
 
   return (
-    <div className="app-container">
+    <main className="container">
+      <h1>Authentification faciale</h1>
+      <h2>Vérification du visage et du clignement</h2>
 
-      {/* HEADER */}
+      <p>
+        Saisissez l'adresse e-mail du compte associé au gabarit facial.
+        Placez votre visage au centre de l'image et clignez naturellement
+        des yeux pendant la capture.
+      </p>
 
-      <header className="app-header">
+      <div className="form-group">
+        <label htmlFor="email">Adresse e-mail du compte</label>
 
-        <div className="app-logo">
-          <div className="logo-icon">
-            📄
-          </div>
+        <input
+          id="email"
+          type="email"
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+          placeholder="exemple@email.com"
+          autoComplete="email"
+          required
+          disabled={loading}
+        />
+      </div>
 
-          <div>
-            <h1>
-              Intelligent Document Extractor
-            </h1>
+      <video
+        ref={videoRef}
+        autoPlay
+        muted
+        playsInline
+        className="webcam"
+      />
 
-            <p>
-              Extraction intelligente de données
-            </p>
-          </div>
-        </div>
-
-        {/* NAVIGATION */}
-
-        <nav className="main-navigation">
-
-          <button
-            className={
-              activePage === "dashboard"
-                ? "nav-button active"
-                : "nav-button"
-            }
-            onClick={() =>
-              setActivePage("dashboard")
-            }
-          >
-            📊 Dashboard
+      <div className="actions">
+        {!cameraActive ? (
+          <button onClick={startCamera} disabled={loading}>
+            Démarrer la caméra
           </button>
-
-          <button
-            className={
-              activePage === "extract"
-                ? "nav-button active"
-                : "nav-button"
-            }
-            onClick={handleNewExtraction}
-          >
-            📤 Nouvelle extraction
+        ) : (
+          <button onClick={stopCamera} disabled={loading}>
+            Arrêter la caméra
           </button>
-
-          <button
-            className={
-              activePage === "history"
-                ? "nav-button active"
-                : "nav-button"
-            }
-            onClick={() =>
-              setActivePage("history")
-            }
-          >
-            📋 Historique
-          </button>
-
-        </nav>
-
-      </header>
-
-      {/* CONTENU */}
-
-      <main className="main-content">
-
-        {activePage === "dashboard" && (
-          <Dashboard />
         )}
 
-        {activePage === "extract" && (
-          <section className="extraction-section">
-
-            <div className="page-title">
-              <h2>
-                📤 Nouvelle extraction
-              </h2>
-
-              <p>
-                Importez une facture pour extraire
-                automatiquement ses informations.
-              </p>
-            </div>
-
-            <div
-  className="upload-card"
-  onDragOver={handleDragOver}
-  onDrop={handleDrop}
->
-
-  <div className="upload-icon">
-    📄
-  </div>
-
-  <h3>
-    Glissez votre facture ici
-  </h3>
-
-  <p>
-    ou sélectionnez un fichier depuis votre ordinateur
-  </p>
-
-  <div className="upload-formats">
-    PDF • PNG • JPG • JPEG
-  </div>
-
-  <label className="file-input-label">
-    📁 Choisir une facture
-
-    <input
-      type="file"
-      accept=".pdf,.png,.jpg,.jpeg"
-      onChange={handleFileChange}
-    />
-  </label>
-
-              {file && (
-                <div className="selected-file">
-                  📎 {file.name}
-                </div>
-              )}
-
-              <button
-                className="extract-button"
-                onClick={handleExtract}
-                disabled={loading}
-              >
-                {loading
-                  ? "⏳ Extraction en cours..."
-                  : "🚀 Extraire les données"}
-              </button>
-              
-              {loading && (
-  <div className="extraction-progress">
-
-    <div
-      className={
-        extractionStep === "upload" ||
-        extractionStep === "ocr" ||
-        extractionStep === "ai" ||
-        extractionStep === "database" ||
-        extractionStep === "done"
-          ? "progress-step completed"
-          : "progress-step"
-      }
-    >
-      <span>📤</span>
-      <div>
-        <strong>Upload du document</strong>
-        <small>
-          {extractionStep === "upload"
-            ? "En cours..."
-            : "Terminé"}
-        </small>
+        <button
+          onClick={captureFrames}
+          disabled={!cameraActive || loading}
+        >
+          {loading ? "Analyse en cours..." : "Vérifier mon visage"}
+        </button>
       </div>
-    </div>
 
-    <div
-      className={
-        extractionStep === "ocr" ||
-        extractionStep === "ai" ||
-        extractionStep === "database" ||
-        extractionStep === "done"
-          ? "progress-step completed"
-          : "progress-step"
-      }
-    >
-      <span>🔍</span>
-      <div>
-        <strong>Analyse OCR</strong>
-        <small>
-          {extractionStep === "ocr"
-            ? "En cours..."
-            : extractionStep === "upload"
-            ? "En attente"
-            : "Terminé"}
-        </small>
-      </div>
-    </div>
-
-    <div
-      className={
-        extractionStep === "ai" ||
-        extractionStep === "database" ||
-        extractionStep === "done"
-          ? "progress-step completed"
-          : "progress-step"
-      }
-    >
-      <span>🤖</span>
-      <div>
-        <strong>Extraction IA</strong>
-        <small>
-          {extractionStep === "ai"
-            ? "En cours..."
-            : extractionStep === "upload" ||
-              extractionStep === "ocr"
-            ? "En attente"
-            : "Terminé"}
-        </small>
-      </div>
-    </div>
-
-    <div
-      className={
-        extractionStep === "database" ||
-        extractionStep === "done"
-          ? "progress-step completed"
-          : "progress-step"
-      }
-    >
-      <span>🗄️</span>
-      <div>
-        <strong>Enregistrement</strong>
-        <small>
-          {extractionStep === "database"
-            ? "En cours..."
-            : extractionStep === "done"
-            ? "Terminé"
-            : "En attente"}
-        </small>
-      </div>
-    </div>
-
-  </div>
-)}
-
-              {error && (
-                <div className="error-box">
-                  ❌ {error}
-                </div>
-              )}
-
-            </div>
-
-            {result && (
-              <InvoiceResult
-                result={result}
-              />
-            )}
-
-          </section>
-        )}
-
-        {activePage === "history" && (
-          <InvoiceHistory />
-        )}
-
-      </main>
-
-      {/* FOOTER */}
-
-      <footer className="app-footer">
-        Intelligent Document Extractor © 2026
-      </footer>
-
-    </div>
+      {message && (
+        <pre className="result" aria-live="polite">
+          {message}
+        </pre>
+      )}
+    </main>
   );
 }
 

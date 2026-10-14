@@ -6,6 +6,7 @@ from app.ocr import (
 from app.id_card_verification import verify_id_card_and_selfie
 from app.auth_routes import router as auth_router
 import tempfile
+from app.liveness_detection import analyze_blink_sequence
 from pathlib import Path
 from app.ai_extractor import extract_invoice_data
 from app.database import (
@@ -417,3 +418,40 @@ async def verify_id_card_endpoint(
     finally:
         await id_photo.close()
         await selfie.close()
+
+        
+@app.post("/liveness/blink")
+async def detect_blink(frames: list[UploadFile] = File(...)):
+    if len(frames) < 5:
+        raise HTTPException(
+            status_code=400,
+            detail="Au moins 5 images sont nécessaires."
+        )
+
+    frame_bytes = []
+
+    for frame in frames:
+        content = await frame.read()
+
+        if content:
+            frame_bytes.append(content)
+
+    try:
+        result = analyze_blink_sequence(frame_bytes)
+        return result
+
+    except ValueError as error:
+        raise HTTPException(
+            status_code=400,
+            detail=str(error)
+        ) from error
+
+    except Exception as error:
+        print(f"Erreur de détection du clignement : {error}")
+
+        raise HTTPException(
+            status_code=500,
+            detail="Une erreur est survenue pendant l'analyse."
+        ) from error
+    
+    
