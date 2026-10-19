@@ -147,14 +147,25 @@ function App() {
     setError("");
   };
 
+  // Drag state for dropzone
+  const [isDragging, setIsDragging] = useState(false);
+
   const handleDragOver = (event) => {
     event.preventDefault();
     event.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragging(false);
   };
 
   const handleDrop = (event) => {
     event.preventDefault();
     event.stopPropagation();
+    setIsDragging(false);
 
     const droppedFile = event.dataTransfer.files[0];
     if (!droppedFile) return;
@@ -191,7 +202,7 @@ function App() {
       const formData = new FormData();
       formData.append("file", file);
 
-      await new Promise((resolve) => setTimeout(resolve, 400));
+      await new Promise((resolve) => setTimeout(resolve, 450));
       setExtractionStep("ocr");
 
       // Optional Bearer token if user is logged in
@@ -215,7 +226,7 @@ function App() {
       }
 
       setExtractionStep("database");
-      await new Promise((resolve) => setTimeout(resolve, 400));
+      await new Promise((resolve) => setTimeout(resolve, 450));
 
       setResult(data);
       setExtractionStep("done");
@@ -240,15 +251,30 @@ function App() {
       <div
         style={{
           display: "flex",
+          flexDirection: "column",
           justifyContent: "center",
           alignItems: "center",
           height: "100vh",
           background: "#0f172a",
           color: "#ffffff",
-          fontFamily: "sans-serif",
+          fontFamily: "var(--font-sans, sans-serif)",
+          gap: "16px",
         }}
       >
-        <div>Chargement de votre session...</div>
+        <div
+          style={{
+            width: "48px",
+            height: "48px",
+            border: "3px solid rgba(99, 102, 241, 0.2)",
+            borderTopColor: "#6366f1",
+            borderRadius: "50%",
+            animation: "spin 1s linear infinite",
+          }}
+        />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        <div style={{ fontSize: "1rem", fontWeight: 600, color: "#94a3b8" }}>
+          Chargement de votre session sécurisée...
+        </div>
       </div>
     );
   }
@@ -265,134 +291,118 @@ function App() {
 
   // 2. IF LOGGED IN -> DISPLAY THE FULL APPLICATION
   const isAdmin = user.is_admin || user.email === "anis@gmail.com";
+  const userInitial = (user.email || "U").charAt(0).toUpperCase();
 
   return (
     <div className="app-container">
-      {/* HEADER */}
+      {/* ENTERPRISE HEADER */}
       <header className="app-header">
-        <div className="app-logo">
-          <div className="logo-icon">📄</div>
-          <div>
-            <h1>Intelligent Document Extractor</h1>
-            <p>Extraction intelligente de factures & gestion documentaire</p>
+        {/* Brand Lockup */}
+        <div className="app-logo" onClick={() => setActivePage("dashboard")}>
+          <div className="logo-icon-wrapper">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+              <line x1="16" y1="13" x2="8" y2="13" />
+              <line x1="16" y1="17" x2="8" y2="17" />
+              <polyline points="10 9 9 9 8 9" />
+            </svg>
+          </div>
+          <div className="logo-text-group">
+            <div className="logo-brand-row">
+              <h1>DocuMind AI</h1>
+              <span className="brand-badge">v2.5 Enterprise</span>
+            </div>
+            <p>Extraction intelligente de factures & KYC biométrique</p>
           </div>
         </div>
 
-        {/* NAVIGATION */}
+        {/* NAVIGATION SEGMENTED */}
         <nav className="main-navigation">
           <button
             type="button"
-            className={
-              activePage === "dashboard"
-                ? "nav-button active"
-                : "nav-button"
-            }
+            className={activePage === "dashboard" ? "nav-button active" : "nav-button"}
             onClick={() => setActivePage("dashboard")}
           >
-            📊 Dashboard
+            <span className="nav-button-icon">📊</span>
+            <span>Tableau de bord</span>
           </button>
 
           <button
             type="button"
-            className={
-              activePage === "extract"
-                ? "nav-button active"
-                : "nav-button"
-            }
+            className={activePage === "extract" ? "nav-button active" : "nav-button"}
             onClick={handleNewExtraction}
           >
-            📤 Nouvelle extraction
+            <span className="nav-button-icon">📤</span>
+            <span>Extraction</span>
           </button>
 
           <button
             type="button"
-            className={
-              activePage === "history"
-                ? "nav-button active"
-                : "nav-button"
-            }
+            className={activePage === "history" ? "nav-button active" : "nav-button"}
             onClick={() => setActivePage("history")}
           >
-            📋 Historique
+            <span className="nav-button-icon">📋</span>
+            <span>Factures</span>
           </button>
 
           {isAdmin && (
             <button
               type="button"
-              className={
-                activePage === "admin"
-                  ? "nav-button active"
-                  : "nav-button"
-              }
+              className={activePage === "admin" ? "nav-button active" : "nav-button"}
               onClick={() => {
                 setActivePage("admin");
                 loadAdminReviews(token, adminStatusFilter);
               }}
-              style={{
-                color: activePage === "admin" ? "#2563eb" : "#d97706",
-                fontWeight: 600,
-              }}
             >
-              🛡️ Administration
+              <span className="nav-button-icon">🛡️</span>
+              <span>Administration</span>
+              {adminReviews.length > 0 && (
+                <span className="nav-badge-alert" title={`${adminReviews.length} demande(s) en attente`}>
+                  {adminReviews.length}
+                </span>
+              )}
             </button>
           )}
 
           <button
             type="button"
-            className={
-              activePage === "identity"
-                ? "nav-button active"
-                : "nav-button"
-            }
+            className={activePage === "identity" ? "nav-button active" : "nav-button"}
             onClick={() => setActivePage("identity")}
           >
-            🪪 Mon identité
+            <span className="nav-button-icon">🪪</span>
+            <span>Mon identité</span>
           </button>
         </nav>
 
-        {/* USER PROFILE & LOGOUT */}
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "flex-end",
-              fontSize: "0.85rem",
-            }}
-          >
-            <span style={{ fontWeight: 600, color: "#1e293b" }}>
-              👤 {user.email}
-            </span>
-            {isAdmin && (
-              <span
-                style={{
-                  fontSize: "0.72rem",
-                  color: "#d97706",
-                  fontWeight: 700,
-                  letterSpacing: "0.5px",
-                }}
-              >
-                ADMINISTRATEUR
+        {/* USER PROFILE & ACTIONS */}
+        <div className="header-actions">
+          <div className="system-status-pill" title="Moteur OCR & IA opérationnels">
+            <span className="status-dot-pulse" />
+            <span>Système actif</span>
+          </div>
+
+          <div className="user-profile-pill">
+            <div className="user-avatar-circle" title={user.email}>
+              {userInitial}
+            </div>
+            <div className="user-meta">
+              <span className="user-email-label" title={user.email}>
+                {user.email}
               </span>
-            )}
+              <span className={`user-role-label ${isAdmin ? "admin-role" : ""}`}>
+                {isAdmin ? "Admin" : "Utilisateur"}
+              </span>
+            </div>
           </div>
 
           <button
             type="button"
+            className="logout-button"
             onClick={handleLogout}
-            style={{
-              padding: "7px 14px",
-              background: "#fee2e2",
-              color: "#991b1b",
-              border: "1px solid #fecaca",
-              borderRadius: "8px",
-              fontSize: "0.85rem",
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
-            title="Se déconnecter"
+            title="Se déconnecter de la plateforme"
           >
-            Déconnexion
+            <span>Déconnexion</span>
           </button>
         </div>
       </header>
@@ -404,30 +414,48 @@ function App() {
 
         {/* 2. NOUVELLE EXTRACTION DE FACTURE */}
         {activePage === "extract" && (
-          <section className="extraction-section">
-            <div className="page-title">
-              <h2>📤 Nouvelle extraction de facture</h2>
+          <section className="extraction-section fade-in">
+            <div className="page-header-banner">
+              <div className="page-title-row">
+                <h2>Nouvelle extraction de document</h2>
+                <span className="page-category-pill">OCR & IA Vision</span>
+              </div>
               <p>
-                Importez une facture pour extraire automatiquement ses
-                informations avec l'OCR et l'IA, puis les enregistrer dans la
-                base de données.
+                Importez une facture numérisée. Notre pipeline OCR combiné à l'intelligence artificielle analyse le document, structure les métadonnées et enregistre automatiquement les données dans MongoDB Atlas.
               </p>
             </div>
 
             <div
-              className="upload-card"
+              className={`upload-card-pro ${isDragging ? "drag-over" : ""}`}
               onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
               onDrop={handleDrop}
             >
-              <div className="upload-icon">📄</div>
+              <div className="upload-icon-orb">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+              </div>
 
-              <h3>Glissez votre facture ici</h3>
-              <p>ou sélectionnez un fichier depuis votre ordinateur</p>
+              <h3>Glissez-déposez votre facture ici</h3>
+              <p className="upload-subtitle">
+                ou parcourez les dossiers de votre appareil
+              </p>
 
-              <div className="upload-formats">PDF • PNG • JPG • JPEG</div>
+              <div className="format-badges-row">
+                <span className="format-badge pdf">PDF</span>
+                <span className="format-badge">PNG</span>
+                <span className="format-badge">JPG</span>
+                <span className="format-badge">JPEG</span>
+              </div>
 
-              <label className="file-input-label">
-                📁 Choisir une facture
+              <label className="btn-file-select">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+                <span>Sélectionner un fichier</span>
                 <input
                   type="file"
                   accept=".pdf,.png,.jpg,.jpeg"
@@ -436,120 +464,187 @@ function App() {
               </label>
 
               {file && (
-                <div className="selected-file" style={{ display: "block", marginTop: "15px" }}>
-                  📎 Facture sélectionnée : <strong>{file.name}</strong> (
-                  {(file.size / 1024).toFixed(1)} Ko)
+                <div className="selected-file-strip">
+                  <div className="file-preview-left">
+                    <div className="file-type-icon">
+                      {file.type === "application/pdf" ? "📄" : "🖼️"}
+                    </div>
+                    <div className="file-info-text">
+                      <span className="file-info-name" title={file.name}>
+                        {file.name}
+                      </span>
+                      <span className="file-info-meta">
+                        {(file.size / 1024).toFixed(1)} Ko • Prêt pour analyse
+                      </span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="btn-remove-file"
+                    onClick={() => {
+                      setFile(null);
+                      setResult(null);
+                      setError("");
+                    }}
+                    title="Supprimer la sélection"
+                  >
+                    ×
+                  </button>
                 </div>
               )}
 
               <button
-                className="extract-button"
+                className="btn-launch-extraction"
                 onClick={handleExtract}
                 disabled={loading || !file}
-                style={{ marginTop: "20px" }}
               >
-                {loading
-                  ? "⏳ Extraction et enregistrement en cours..."
-                  : "🚀 Extraire les données & Sauvegarder"}
+                {loading ? (
+                  <>
+                    <span style={{ display: "inline-block", animation: "spin 1s linear infinite" }}>⏳</span>
+                    <span>Traitement intelligent en cours...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>🚀</span>
+                    <span>Lancer l'extraction & Enregistrer</span>
+                  </>
+                )}
               </button>
 
               {loading && (
-                <div className="extraction-progress">
-                  <div
-                    className={
-                      extractionStep === "upload" ||
-                      extractionStep === "ocr" ||
-                      extractionStep === "ai" ||
-                      extractionStep === "database" ||
-                      extractionStep === "done"
-                        ? "progress-step completed"
-                        : "progress-step"
-                    }
-                  >
-                    <span>📤</span>
-                    <div>
-                      <strong>Upload du document</strong>
-                      <small>
-                        {extractionStep === "upload" ? "En cours..." : "Terminé"}
-                      </small>
-                    </div>
+                <div className="extraction-pipeline-card">
+                  <div className="pipeline-header">
+                    <h4>Pipeline d'extraction documentaire</h4>
+                    <span className="pipeline-status-badge">Traitement actif</span>
                   </div>
 
-                  <div
-                    className={
-                      extractionStep === "ocr" ||
-                      extractionStep === "ai" ||
-                      extractionStep === "database" ||
-                      extractionStep === "done"
-                        ? "progress-step completed"
-                        : "progress-step"
-                    }
-                  >
-                    <span>🔍</span>
-                    <div>
-                      <strong>Analyse OCR</strong>
-                      <small>
-                        {extractionStep === "ocr"
-                          ? "En cours..."
-                          : extractionStep === "upload"
-                          ? "En attente"
-                          : "Terminé"}
-                      </small>
+                  <div className="pipeline-steps-list">
+                    <div
+                      className={`pipeline-step-item ${
+                        extractionStep === "upload"
+                          ? "active"
+                          : extractionStep === "ocr" ||
+                            extractionStep === "ai" ||
+                            extractionStep === "database" ||
+                            extractionStep === "done"
+                          ? "completed"
+                          : ""
+                      }`}
+                    >
+                      <div className="step-circle-indicator">
+                        {extractionStep === "ocr" ||
+                        extractionStep === "ai" ||
+                        extractionStep === "database" ||
+                        extractionStep === "done"
+                          ? "✓"
+                          : "1"}
+                      </div>
+                      <div className="step-label-group">
+                        <strong>Upload & Contrôle d'intégrité</strong>
+                        <small>
+                          {extractionStep === "upload" ? "Transmission du fichier..." : "Document validé"}
+                        </small>
+                      </div>
                     </div>
-                  </div>
 
-                  <div
-                    className={
-                      extractionStep === "ai" ||
-                      extractionStep === "database" ||
-                      extractionStep === "done"
-                        ? "progress-step completed"
-                        : "progress-step"
-                    }
-                  >
-                    <span>🤖</span>
-                    <div>
-                      <strong>Extraction IA</strong>
-                      <small>
-                        {extractionStep === "ai"
-                          ? "En cours..."
-                          : extractionStep === "upload" ||
-                            extractionStep === "ocr"
-                          ? "En attente"
-                          : "Terminé"}
-                      </small>
+                    <div
+                      className={`pipeline-step-item ${
+                        extractionStep === "ocr"
+                          ? "active"
+                          : extractionStep === "ai" ||
+                            extractionStep === "database" ||
+                            extractionStep === "done"
+                          ? "completed"
+                          : ""
+                      }`}
+                    >
+                      <div className="step-circle-indicator">
+                        {extractionStep === "ai" ||
+                        extractionStep === "database" ||
+                        extractionStep === "done"
+                          ? "✓"
+                          : "2"}
+                      </div>
+                      <div className="step-label-group">
+                        <strong>Reconnaissance Optique de Caractères (OCR)</strong>
+                        <small>
+                          {extractionStep === "ocr"
+                            ? "Numérisation et extraction du texte brut..."
+                            : extractionStep === "upload"
+                            ? "En attente"
+                            : "Texte extrait avec succès"}
+                        </small>
+                      </div>
                     </div>
-                  </div>
 
-                  <div
-                    className={
-                      extractionStep === "database" ||
-                      extractionStep === "done"
-                        ? "progress-step completed"
-                        : "progress-step"
-                    }
-                  >
-                    <span>🗄️</span>
-                    <div>
-                      <strong>Enregistrement dans MongoDB Atlas</strong>
-                      <small>
-                        {extractionStep === "database"
-                          ? "En cours..."
+                    <div
+                      className={`pipeline-step-item ${
+                        extractionStep === "ai"
+                          ? "active"
+                          : extractionStep === "database" ||
+                            extractionStep === "done"
+                          ? "completed"
+                          : ""
+                      }`}
+                    >
+                      <div className="step-circle-indicator">
+                        {extractionStep === "database" || extractionStep === "done"
+                          ? "✓"
+                          : "3"}
+                      </div>
+                      <div className="step-label-group">
+                        <strong>Extraction Sémantique par IA</strong>
+                        <small>
+                          {extractionStep === "ai"
+                            ? "Structuration des montants, taxes, dates et tiers..."
+                            : extractionStep === "upload" || extractionStep === "ocr"
+                            ? "En attente"
+                            : "Champs reconnus et formatés"}
+                        </small>
+                      </div>
+                    </div>
+
+                    <div
+                      className={`pipeline-step-item ${
+                        extractionStep === "database"
+                          ? "active"
                           : extractionStep === "done"
-                          ? "Terminé"
-                          : "En attente"}
-                      </small>
+                          ? "completed"
+                          : ""
+                      }`}
+                    >
+                      <div className="step-circle-indicator">
+                        {extractionStep === "done" ? "✓" : "4"}
+                      </div>
+                      <div className="step-label-group">
+                        <strong>Enregistrement dans MongoDB Atlas</strong>
+                        <small>
+                          {extractionStep === "database"
+                            ? "Indexation et sauvegarde sécurisée..."
+                            : extractionStep === "done"
+                            ? "Enregistrement confirmé"
+                            : "En attente"}
+                        </small>
+                      </div>
                     </div>
                   </div>
                 </div>
               )}
 
-              {error && <div className="error-box">❌ {error}</div>}
+              {error && (
+                <div className="alert-box-pro danger">
+                  <span style={{ fontSize: "1.2rem" }}>⚠️</span>
+                  <div>
+                    <strong>Erreur de traitement :</strong> {error}
+                  </div>
+                </div>
+              )}
             </div>
 
             {result && (
-              <div style={{ marginTop: "30px" }}>
-                <InvoiceResult result={result} />
+              <div style={{ marginTop: "12px" }}>
+                <InvoiceResult result={result} onNewExtraction={handleNewExtraction} />
               </div>
             )}
           </section>
@@ -558,7 +653,7 @@ function App() {
         {/* 3. HISTORIQUE DES FACTURES */}
         {activePage === "history" && <InvoiceHistory />}
 
-        {/* 4. ADMINISTRATION (EXAMEN DES PIECES D'IDENTITE - ETAPE 2) */}
+        {/* 4. ADMINISTRATION (EXAMEN DES PIECES D'IDENTITE) */}
         {activePage === "admin" && isAdmin && (
           <AdminDocumentReview
             reviews={adminReviews}
@@ -590,10 +685,25 @@ function App() {
         )}
       </main>
 
-      {/* FOOTER */}
-      <footer className="app-footer">
-        Intelligent Document Extractor © 2026 — Extraction intelligente de factures & Authentification biométrique
+      {/* FOOTER ENTERPRISE */}
+      <footer className="app-footer-pro">
+        <div>
+          <strong>DocuMind AI</strong> • Intelligent Document Extractor © 2026. Tous droits réservés.
+        </div>
+        <div className="footer-badges-group">
+          <span className="footer-security-badge" title="Chiffrement des documents">
+            🔒 AES-256 Chiffré
+          </span>
+          <span className="footer-security-badge" title="Conformité des données">
+            🛡️ RGPD / GDPR Conforme
+          </span>
+          <span className="footer-security-badge" title="Base de données Cloud">
+            ☁️ MongoDB Atlas
+          </span>
+        </div>
       </footer>
+
+      {/* AI COPILOT CHAT WIDGET */}
       <ChatWidget token={token} isAdmin={isAdmin} />
     </div>
   );

@@ -1,0 +1,22 @@
+
+# Secrets
+.env
+.env.*
+!.env.example
+backend/.env
+
+# Documents d'identité privés
+backend/private_identity_documents/
+
+# Python
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+
+# Frontend
+node_modules/
+frontend/dist/
+
+# Logs
+*.log
