@@ -9,7 +9,7 @@ export default function AuthGateway({
 
   // Facial auth state
   const [faceEmail, setFaceEmail] = useState(
-    () => localStorage.getItem("last_auth_email") || "anis2003@gmail.com"
+    () => localStorage.getItem("last_auth_email")
   );
   const [cameraActive, setCameraActive] = useState(false);
   const [facialLoading, setFacialLoading] = useState(false);
