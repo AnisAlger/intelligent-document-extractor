@@ -333,10 +333,13 @@ function InvoiceHistory() {
 
       {/* Stats Summary Line */}
       <div
+        className="history-stats-summary-bar"
         style={{
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
+          flexWrap: "wrap",
+          gap: "8px",
           fontSize: "0.85rem",
           color: "var(--text-muted)",
           padding: "0 4px",

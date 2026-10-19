@@ -30,6 +30,9 @@ function App() {
   const [adminReviews, setAdminReviews] = useState([]);
   const [adminStatusFilter, setAdminStatusFilter] = useState("review_required");
 
+  // Responsive mobile menu state
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   // Restore session from localStorage on mount
   useEffect(() => {
     const savedToken = localStorage.getItem("token");
@@ -318,11 +321,14 @@ function App() {
         </div>
 
         {/* NAVIGATION SEGMENTED */}
-        <nav className="main-navigation">
+        <nav className={`main-navigation ${mobileMenuOpen ? "mobile-open" : ""}`}>
           <button
             type="button"
             className={activePage === "dashboard" ? "nav-button active" : "nav-button"}
-            onClick={() => setActivePage("dashboard")}
+            onClick={() => {
+              setActivePage("dashboard");
+              setMobileMenuOpen(false);
+            }}
           >
             <span className="nav-button-icon">📊</span>
             <span>Tableau de bord</span>
@@ -331,7 +337,10 @@ function App() {
           <button
             type="button"
             className={activePage === "extract" ? "nav-button active" : "nav-button"}
-            onClick={handleNewExtraction}
+            onClick={() => {
+              handleNewExtraction();
+              setMobileMenuOpen(false);
+            }}
           >
             <span className="nav-button-icon">📤</span>
             <span>Extraction</span>
@@ -340,7 +349,10 @@ function App() {
           <button
             type="button"
             className={activePage === "history" ? "nav-button active" : "nav-button"}
-            onClick={() => setActivePage("history")}
+            onClick={() => {
+              setActivePage("history");
+              setMobileMenuOpen(false);
+            }}
           >
             <span className="nav-button-icon">📋</span>
             <span>Factures</span>
@@ -353,6 +365,7 @@ function App() {
               onClick={() => {
                 setActivePage("admin");
                 loadAdminReviews(token, adminStatusFilter);
+                setMobileMenuOpen(false);
               }}
             >
               <span className="nav-button-icon">🛡️</span>
@@ -368,7 +381,10 @@ function App() {
           <button
             type="button"
             className={activePage === "identity" ? "nav-button active" : "nav-button"}
-            onClick={() => setActivePage("identity")}
+            onClick={() => {
+              setActivePage("identity");
+              setMobileMenuOpen(false);
+            }}
           >
             <span className="nav-button-icon">🪪</span>
             <span>Mon identité</span>
@@ -403,6 +419,17 @@ function App() {
             title="Se déconnecter de la plateforme"
           >
             <span>Déconnexion</span>
+          </button>
+
+          {/* HAMBURGER TOGGLE FOR MOBILE / TABLET */}
+          <button
+            type="button"
+            className={`mobile-menu-toggle ${mobileMenuOpen ? "active" : ""}`}
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label={mobileMenuOpen ? "Fermer le menu" : "Ouvrir le menu de navigation"}
+            title={mobileMenuOpen ? "Fermer le menu" : "Ouvrir le menu de navigation"}
+          >
+            <span className="hamburger-icon">{mobileMenuOpen ? "✕" : "☰"}</span>
           </button>
         </div>
       </header>

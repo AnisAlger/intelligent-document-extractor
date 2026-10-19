@@ -314,3 +314,51 @@
   color: var(--text-muted);
   text-align: center;
 }
+
+@media (max-width: 520px) {
+  .auth-gateway-container {
+    padding: 16px 12px;
+  }
+
+  .auth-gateway-card {
+    border-radius: var(--radius-xl);
+  }
+
+  .auth-gateway-header {
+    padding: 24px 18px 16px;
+  }
+
+  .auth-gateway-logo {
+    width: 48px;
+    height: 48px;
+    font-size: 24px;
+    margin-bottom: 10px;
+  }
+
+  .auth-gateway-header h1 {
+    font-size: 1.3rem;
+  }
+
+  .auth-tabs-nav {
+    margin: 14px 14px 0;
+    gap: 2px;
+  }
+
+  .auth-tab-btn {
+    padding: 8px 6px;
+    font-size: 0.78rem;
+  }
+
+  .auth-gateway-body {
+    padding: 20px 16px 24px;
+  }
+
+  .facial-camera-viewport {
+    height: 220px;
+  }
+
+  .face-oval-guide {
+    width: 130px;
+    height: 170px;
+  }
+}

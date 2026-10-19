@@ -285,6 +285,34 @@
   transform: translateY(-1px);
 }
 
+.mobile-menu-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: #ffffff;
+  color: var(--text-main);
+  font-size: 1.25rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  box-shadow: var(--shadow-xs);
+  flex-shrink: 0;
+}
+
+.mobile-menu-toggle:hover {
+  background: #f1f5f9;
+  border-color: var(--border-default);
+}
+
+.mobile-menu-toggle.active {
+  background: #eff6ff;
+  color: var(--primary-600);
+  border-color: var(--primary-300);
+}
+
 /* =========================================
    MAIN CONTENT WRAPPER
    ========================================= */
@@ -1559,4 +1587,424 @@
   gap: 5px;
   color: #059669;
   font-weight: 600;
+}
+
+/* ==========================================================================
+   COMPREHENSIVE RESPONSIVE DESIGN SYSTEM
+   Adapts layout smoothly across Desktop, Laptop, Tablet & Mobile (320px - 1440px)
+   ========================================================================== */
+
+/* 1. Large Tablets & Small Desktops (<= 1024px) */
+@media (max-width: 1024px) {
+  .app-header {
+    padding: 12px 24px;
+    gap: 16px;
+  }
+
+  .main-content {
+    padding: 28px 24px 56px;
+  }
+
+  .kpi-metrics-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+}
+
+/* 2. Tablets & Mobile Breakpoint (<= 960px) */
+@media (max-width: 960px) {
+  .app-header {
+    padding: 12px 18px;
+    flex-wrap: wrap;
+    position: sticky;
+    top: 0;
+  }
+
+  /* Show mobile hamburger button */
+  .mobile-menu-toggle {
+    display: flex;
+  }
+
+  /* Main Navigation transforms into collapsible dropdown drawer */
+  .main-navigation {
+    display: none;
+    order: 10;
+    width: 100%;
+    flex-direction: column;
+    padding: 8px;
+    gap: 4px;
+    margin-top: 10px;
+    background: #ffffff;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.1);
+  }
+
+  .main-navigation.mobile-open {
+    display: flex;
+    animation: fadeIn 0.2s ease forwards;
+  }
+
+  .nav-button {
+    width: 100%;
+    justify-content: flex-start;
+    padding: 12px 16px;
+    font-size: 0.95rem;
+    border-radius: var(--radius-md);
+  }
+
+  .header-actions {
+    gap: 8px;
+  }
+
+  /* Result Grid collapses to single column */
+  .result-grid-two-col {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+}
+
+/* 3. Small Tablets & Phablets (<= 768px) */
+@media (max-width: 768px) {
+  .main-content {
+    padding: 20px 16px 48px;
+  }
+
+  .page-header-banner {
+    margin-bottom: 20px;
+  }
+
+  .page-title-row {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .page-title-row h2 {
+    font-size: 1.35rem;
+  }
+
+  .page-category-pill {
+    font-size: 0.65rem;
+    padding: 2px 7px;
+  }
+
+  /* Upload Dropzone Responsive */
+  .upload-card-pro {
+    padding: 32px 16px;
+    border-radius: var(--radius-lg);
+  }
+
+  .upload-icon-orb {
+    width: 62px;
+    height: 62px;
+    margin-bottom: 14px;
+  }
+
+  .upload-icon-orb svg {
+    width: 32px;
+    height: 32px;
+  }
+
+  .upload-card-pro h3 {
+    font-size: 1.15rem;
+  }
+
+  .upload-card-pro p.upload-subtitle {
+    font-size: 0.88rem;
+    margin-bottom: 14px;
+  }
+
+  .btn-file-select {
+    width: 100%;
+    max-width: 100%;
+    justify-content: center;
+    padding: 12px 20px;
+    font-size: 0.9rem;
+  }
+
+  .selected-file-strip {
+    max-width: 100%;
+    padding: 10px 14px;
+  }
+
+  .btn-launch-extraction {
+    max-width: 100%;
+    padding: 13px 20px;
+    font-size: 0.95rem;
+  }
+
+  .extraction-pipeline-card {
+    max-width: 100%;
+    padding: 18px 16px;
+  }
+
+  .pipeline-step-item {
+    padding: 8px 12px;
+    gap: 10px;
+  }
+
+  /* History Toolbar Responsive Stacking */
+  .history-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding: 16px;
+  }
+
+  .search-input-wrapper {
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .toolbar-actions-group {
+    flex-wrap: wrap;
+    width: 100%;
+    gap: 8px;
+  }
+
+  .btn-export-excel,
+  .btn-export-pdf,
+  .btn-action-refresh {
+    flex: 1 1 calc(50% - 6px);
+    justify-content: center;
+    padding: 9px 12px;
+    font-size: 0.8rem;
+  }
+
+  /* Table Mobile Scrollable & Compact */
+  .table-card-container {
+    border-radius: var(--radius-lg);
+  }
+
+  .table-responsive-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+  }
+
+  .enterprise-table thead th {
+    padding: 10px 12px;
+    font-size: 0.7rem;
+  }
+
+  .enterprise-table td {
+    padding: 10px 12px;
+    font-size: 0.82rem;
+  }
+
+  .invoice-badge-number {
+    font-size: 0.75rem;
+    padding: 2px 6px;
+  }
+
+  .btn-table-action {
+    padding: 5px 8px;
+    font-size: 0.75rem;
+  }
+
+  /* Invoice Result Card Mobile */
+  .invoice-result-card {
+    padding: 22px 18px;
+    border-radius: var(--radius-lg);
+  }
+
+  .result-card-banner {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+  }
+
+  .result-banner-left {
+    width: 100%;
+  }
+
+  .result-card-banner > div:last-child {
+    flex-direction: column;
+    width: 100%;
+    gap: 8px;
+  }
+
+  .result-card-banner button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .result-fields-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .financial-summary-card {
+    padding: 20px 18px;
+    border-radius: var(--radius-md);
+  }
+
+  .fin-row.total-ttc-row .amount-highlight {
+    font-size: 1.25rem;
+  }
+
+  /* Modals Mobile Adaptation */
+  .modal-backdrop-blur {
+    padding: 12px;
+  }
+
+  .modal-card-pro {
+    width: 100%;
+    max-width: 100%;
+    max-height: 92vh;
+    border-radius: var(--radius-xl);
+  }
+
+  .modal-card-header {
+    padding: 16px 20px;
+  }
+
+  .modal-card-header h3 {
+    font-size: 1.15rem;
+  }
+
+  .modal-card-body {
+    padding: 18px 20px;
+  }
+
+  .modal-card-footer {
+    padding: 14px 20px;
+    flex-direction: column-reverse;
+    gap: 8px;
+  }
+
+  .modal-card-footer button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .edit-form-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  /* Footer Mobile */
+  .app-footer-pro {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 14px;
+    padding: 20px 16px;
+  }
+
+  .footer-badges-group {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px;
+  }
+}
+
+/* 4. Small Mobile Phones (<= 540px) */
+@media (max-width: 540px) {
+  .app-header {
+    padding: 10px 14px;
+  }
+
+  .app-logo {
+    gap: 10px;
+  }
+
+  .logo-icon-wrapper {
+    width: 38px;
+    height: 38px;
+  }
+
+  .logo-icon-wrapper svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .app-logo h1 {
+    font-size: 1.05rem;
+  }
+
+  /* Hide subtitle text on very small headers */
+  .app-logo p {
+    display: none;
+  }
+
+  .brand-badge {
+    display: none;
+  }
+
+  /* Hide verbose system pill on phones */
+  .system-status-pill {
+    display: none;
+  }
+
+  /* Compact User Profile Pill */
+  .user-profile-pill {
+    padding: 3px;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+  }
+
+  .user-meta {
+    display: none;
+  }
+
+  .logout-button {
+    padding: 6px 10px;
+    font-size: 0.75rem;
+  }
+
+  /* Dashboard KPIs to 1 Column */
+  .kpi-metrics-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .kpi-metric-card {
+    padding: 16px;
+  }
+
+  .kpi-card-value {
+    font-size: 1.5rem;
+  }
+
+  .chart-card-pro {
+    padding: 18px 14px;
+  }
+
+  .chart-card-header h3 {
+    font-size: 1.05rem;
+  }
+
+  .chart-viewport {
+    height: 260px;
+  }
+
+  /* Buttons stack full width on small phones */
+  .btn-export-excel,
+  .btn-export-pdf,
+  .btn-action-refresh {
+    flex: 1 1 100%;
+  }
+
+  .format-badges-row {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+  }
+}
+
+/* 5. Extra Narrow Screens (<= 360px) */
+@media (max-width: 360px) {
+  .main-content {
+    padding: 14px 10px 36px;
+  }
+
+  .upload-card-pro {
+    padding: 24px 10px;
+  }
+
+  .kpi-card-value {
+    font-size: 1.35rem;
+  }
 }

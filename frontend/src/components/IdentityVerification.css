@@ -319,3 +319,28 @@
   color: var(--text-muted);
   font-size: 0.85rem;
 }
+
+@media (max-width: 600px) {
+  .identity-upload-card {
+    padding: 20px 16px;
+  }
+
+  .document-frame-guide {
+    height: 180px;
+  }
+
+  .identity-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .identity-actions button[type="submit"] {
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .identity-actions .identity-reset {
+    width: 100%;
+    text-align: center;
+  }
+}
