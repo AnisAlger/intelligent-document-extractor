@@ -21,7 +21,7 @@ export default function AuthGateway({
   const streamRef = useRef(null);
 
   // Password / Register form states
-  const [email, setEmail] = useState("anis@gmail.com");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [standardLoading, setStandardLoading] = useState(false);
@@ -368,7 +368,7 @@ export default function AuthGateway({
               )}
 
               <div className="auth-demo-tip">
-                💡 <strong>Astuce :</strong> Le compte <code>anis2003@gmail.com</code> possède un gabarit facial enregistré. Placez votre visage dans l'ovale et clignez des yeux.
+                💡 <strong>Astuce :</strong>Placez votre visage dans l'ovale et clignez des yeux.
               </div>
             </div>
           )}
