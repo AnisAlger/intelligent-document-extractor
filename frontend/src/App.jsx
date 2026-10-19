@@ -8,7 +8,7 @@ import IdentitySubmission from "./components/IdentitySubmission";
 import AuthGateway from "./components/AuthGateway";
 import ChatWidget from "./components/ChatWidget";
 
-const API_URL = "http://127.0.0.1:8000";
+const API_URL = "https://intelligent-document-extractor-api.onrender.com";
 
 function App() {
   // Authentication state
@@ -548,22 +548,21 @@ function App() {
 
                   <div className="pipeline-steps-list">
                     <div
-                      className={`pipeline-step-item ${
-                        extractionStep === "upload"
+                      className={`pipeline-step-item ${extractionStep === "upload"
                           ? "active"
                           : extractionStep === "ocr" ||
                             extractionStep === "ai" ||
                             extractionStep === "database" ||
                             extractionStep === "done"
-                          ? "completed"
-                          : ""
-                      }`}
+                            ? "completed"
+                            : ""
+                        }`}
                     >
                       <div className="step-circle-indicator">
                         {extractionStep === "ocr" ||
-                        extractionStep === "ai" ||
-                        extractionStep === "database" ||
-                        extractionStep === "done"
+                          extractionStep === "ai" ||
+                          extractionStep === "database" ||
+                          extractionStep === "done"
                           ? "✓"
                           : "1"}
                       </div>
@@ -576,20 +575,19 @@ function App() {
                     </div>
 
                     <div
-                      className={`pipeline-step-item ${
-                        extractionStep === "ocr"
+                      className={`pipeline-step-item ${extractionStep === "ocr"
                           ? "active"
                           : extractionStep === "ai" ||
                             extractionStep === "database" ||
                             extractionStep === "done"
-                          ? "completed"
-                          : ""
-                      }`}
+                            ? "completed"
+                            : ""
+                        }`}
                     >
                       <div className="step-circle-indicator">
                         {extractionStep === "ai" ||
-                        extractionStep === "database" ||
-                        extractionStep === "done"
+                          extractionStep === "database" ||
+                          extractionStep === "done"
                           ? "✓"
                           : "2"}
                       </div>
@@ -599,21 +597,20 @@ function App() {
                           {extractionStep === "ocr"
                             ? "Numérisation et extraction du texte brut..."
                             : extractionStep === "upload"
-                            ? "En attente"
-                            : "Texte extrait avec succès"}
+                              ? "En attente"
+                              : "Texte extrait avec succès"}
                         </small>
                       </div>
                     </div>
 
                     <div
-                      className={`pipeline-step-item ${
-                        extractionStep === "ai"
+                      className={`pipeline-step-item ${extractionStep === "ai"
                           ? "active"
                           : extractionStep === "database" ||
                             extractionStep === "done"
-                          ? "completed"
-                          : ""
-                      }`}
+                            ? "completed"
+                            : ""
+                        }`}
                     >
                       <div className="step-circle-indicator">
                         {extractionStep === "database" || extractionStep === "done"
@@ -626,20 +623,19 @@ function App() {
                           {extractionStep === "ai"
                             ? "Structuration des montants, taxes, dates et tiers..."
                             : extractionStep === "upload" || extractionStep === "ocr"
-                            ? "En attente"
-                            : "Champs reconnus et formatés"}
+                              ? "En attente"
+                              : "Champs reconnus et formatés"}
                         </small>
                       </div>
                     </div>
 
                     <div
-                      className={`pipeline-step-item ${
-                        extractionStep === "database"
+                      className={`pipeline-step-item ${extractionStep === "database"
                           ? "active"
                           : extractionStep === "done"
-                          ? "completed"
-                          : ""
-                      }`}
+                            ? "completed"
+                            : ""
+                        }`}
                     >
                       <div className="step-circle-indicator">
                         {extractionStep === "done" ? "✓" : "4"}
@@ -650,8 +646,8 @@ function App() {
                           {extractionStep === "database"
                             ? "Indexation et sauvegarde sécurisée..."
                             : extractionStep === "done"
-                            ? "Enregistrement confirmé"
-                            : "En attente"}
+                              ? "Enregistrement confirmé"
+                              : "En attente"}
                         </small>
                       </div>
                     </div>
