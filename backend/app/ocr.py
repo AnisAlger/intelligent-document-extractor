@@ -1,18 +1,32 @@
+import os
+import platform
 import pytesseract
 from PIL import Image
 from pdf2image import convert_from_path
 import cv2
 import numpy as np
 
+# Configuration Tesseract (compatible Windows local et Linux/Render)
+WINDOWS_TESSERACT = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+TESSERACT_ENV = os.getenv("TESSERACT_CMD")
 
+if TESSERACT_ENV:
+    pytesseract.pytesseract.tesseract_cmd = TESSERACT_ENV
+elif platform.system() == "Windows" and os.path.exists(WINDOWS_TESSERACT):
+    pytesseract.pytesseract.tesseract_cmd = WINDOWS_TESSERACT
+# Sur Linux (ex: Render), pytesseract utilisera automatiquement le binaire 'tesseract' dans le PATH
 
-# Tesseract
-TESSERACT_PATH = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+# Configuration Poppler (compatible Windows local et Linux/Render)
+WINDOWS_POPPLER = r"C:\Users\ISSER TECH\Downloads\poppler-26.09.0\Library\bin"
+POPPLER_ENV = os.getenv("POPPLER_PATH")
 
-# Poppler
-POPPLER_PATH = r"C:\Users\ISSER TECH\Downloads\poppler-26.09.0\Library\bin"
-
-pytesseract.pytesseract.tesseract_cmd = TESSERACT_PATH
+if POPPLER_ENV:
+    POPPLER_PATH = POPPLER_ENV
+elif platform.system() == "Windows" and os.path.isdir(WINDOWS_POPPLER):
+    POPPLER_PATH = WINDOWS_POPPLER
+else:
+    # Sur Linux/Render, pdftoppm est disponible globalement dans /usr/bin
+    POPPLER_PATH = None
 
 
 def extract_text_from_image(image_path: str) -> str:
@@ -35,11 +49,11 @@ def extract_text_from_pdf(pdf_path: str) -> str:
     Convert PDF pages to images and extract text using Tesseract.
     """
 
-    pages = convert_from_path(
-        pdf_path,
-        dpi=300,
-        poppler_path=POPPLER_PATH
-    )
+    kwargs = {"dpi": 300}
+    if POPPLER_PATH:
+        kwargs["poppler_path"] = POPPLER_PATH
+
+    pages = convert_from_path(pdf_path, **kwargs)
 
     all_text = []
 

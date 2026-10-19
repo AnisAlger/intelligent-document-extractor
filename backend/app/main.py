@@ -26,6 +26,7 @@ from app.exports import (
 )
 from app.face_verification import compare_identity_face
 import shutil
+import os
 
 app = FastAPI(
     title="Intelligent Document Extractor",
@@ -35,9 +36,13 @@ app = FastAPI(
 app.include_router(auth_router)
 app.include_router(chat_router)
 
+cors_origins_env = os.getenv("ALLOWED_ORIGINS", "")
+origins_list = [o.strip() for o in cors_origins_env.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=origins_list if origins_list else ["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origin_regex=None if origins_list else r"https?://.*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
