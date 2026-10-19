@@ -12,8 +12,12 @@ from fastapi import (
     status,
     File, 
     UploadFile,
-    Form
+    Form,
+    Query,
 )
+from fastapi.responses import FileResponse
+from pathlib import Path
+from uuid import uuid4
 from app.id_card_verification import verify_id_card_and_selfie
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr, Field
@@ -95,6 +99,12 @@ class IdentityReviewRequest(BaseModel):
     status: Literal["verified", "rejected"]
     review_note: str = Field(default="", max_length=500)
 
+PRIVATE_DOCUMENTS_DIR = (
+    Path(__file__).resolve().parent.parent
+    / "private_identity_documents"
+)
+
+PRIVATE_DOCUMENTS_DIR.mkdir(parents=True, exist_ok=True)
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 def register(data: RegisterRequest):
@@ -189,9 +199,17 @@ def get_current_user(
                 detail="Utilisateur introuvable.",
             )
 
+        admin_emails = {
+            e.strip().lower()
+            for e in os.getenv("ADMIN_EMAILS", "").split(",")
+            if e.strip()
+        }
+        is_admin = user["email"].strip().lower() in admin_emails
+
         return {
             "id": str(user["_id"]),
             "email": user["email"],
+            "is_admin": is_admin,
             "face_registered": user.get("face_template") is not None,
             "created_at": user.get("created_at"),
         }
@@ -312,7 +330,9 @@ async def review_identity(
     result = users_collection.update_one(
         {
             "_id": target_id,
-            "identity_verification.status": "review_required",
+            "identity_verification.status": {
+                "$in": ["review_required", "verified", "rejected"]
+            },
         },
         {
             "$set": {
@@ -322,6 +342,7 @@ async def review_identity(
                 ),
                 "identity_verification.reviewed_at": now,
                 "identity_verification.reviewed_by": str(admin["_id"]),
+                "identity_verification.reviewed_by_email": admin.get("email"),
                 "identity_verification.review_note": decision.review_note,
             }
         },
@@ -340,6 +361,8 @@ async def review_identity(
         "success": True,
         "user_id": user_id,
         "status": decision.status,
+        "review_note": decision.review_note,
+        "reviewed_at": now.isoformat(),
         "message": (
             "Identité validée."
             if decision.status == "verified"
@@ -350,12 +373,20 @@ async def review_identity(
 
 @router.get("/admin/identity-reviews")
 def list_identity_reviews(
+    status_filter: str = Query(default="review_required"),
     admin=Depends(require_admin),
 ):
+    """
+    Retourne la liste des dossiers de vérification d'identité.
+    Permet de filtrer par statut : 'review_required', 'verified', 'rejected', ou 'all'.
+    """
+    if status_filter == "all":
+        query = {"identity_verification.status": {"$exists": True, "$ne": None}}
+    else:
+        query = {"identity_verification.status": status_filter}
+
     documents = users_collection.find(
-        {
-            "identity_verification.status": "review_required"
-        },
+        query,
         {
             "email": 1,
             "identity_verification": 1,
@@ -374,17 +405,33 @@ def list_identity_reviews(
         comparison = verification.get(
             "face_comparison", {}
         )
+        docs_meta = verification.get(
+            "documents", {}
+        )
+        ocr_meta = verification.get(
+            "ocr", {}
+        )
 
         submitted_at = verification.get("submitted_at")
+        reviewed_at = verification.get("reviewed_at")
+
+        user_id_str = str(document["_id"])
+        has_id_card = bool(docs_meta.get("id_card_filename"))
+        has_selfie = bool(docs_meta.get("selfie_filename"))
 
         items.append({
-            "user_id": str(document["_id"]),
+            "user_id": user_id_str,
             "email": document.get("email"),
             "status": verification.get("status"),
             "submitted_at": (
                 submitted_at.isoformat()
                 if submitted_at else None
             ),
+            "reviewed_at": (
+                reviewed_at.isoformat()
+                if reviewed_at else None
+            ),
+            "review_note": verification.get("review_note", ""),
             "id_card_checked": verification.get(
                 "id_card_checked", False
             ),
@@ -395,12 +442,183 @@ def list_identity_reviews(
                 "comparison_score"
             ),
             "score_type": comparison.get("score_type"),
+            "documents": {
+                "has_id_card": has_id_card,
+                "has_selfie": has_selfie,
+                "id_card_url": (
+                    f"/auth/admin/users/{user_id_str}/documents/id_card"
+                    if has_id_card else None
+                ),
+                "selfie_url": (
+                    f"/auth/admin/users/{user_id_str}/documents/selfie"
+                    if has_selfie else None
+                ),
+            },
+            "ocr": {
+                "text_detected": ocr_meta.get("text_detected", False),
+                "text": ocr_meta.get("text", ""),
+            } if ocr_meta else None,
         })
 
     return {
         "count": len(items),
+        "status_filter": status_filter,
         "items": items,
     }
+
+
+@router.get("/admin/users/{user_id}/identity-review")
+def get_user_identity_review_detail(
+    user_id: str,
+    admin=Depends(require_admin),
+):
+    """
+    Récupère le détail complet d'un dossier pour examen approfondi par l'administrateur.
+    """
+    try:
+        target_id = ObjectId(user_id)
+    except (InvalidId, TypeError):
+        raise HTTPException(
+            status_code=400,
+            detail="Identifiant utilisateur invalide.",
+        )
+
+    target_user = users_collection.find_one({"_id": target_id})
+    if not target_user:
+        raise HTTPException(
+            status_code=404,
+            detail="Utilisateur introuvable.",
+        )
+
+    verification = target_user.get("identity_verification") or {}
+    if not verification:
+        raise HTTPException(
+            status_code=404,
+            detail="Aucun dossier de vérification d'identité pour cet utilisateur.",
+        )
+
+    comparison = verification.get("face_comparison") or {}
+    docs_meta = verification.get("documents") or {}
+    ocr_meta = verification.get("ocr") or {}
+
+    submitted_at = verification.get("submitted_at")
+    reviewed_at = verification.get("reviewed_at")
+
+    has_id_card = bool(docs_meta.get("id_card_filename"))
+    has_selfie = bool(docs_meta.get("selfie_filename"))
+
+    return {
+        "user_id": str(target_user["_id"]),
+        "email": target_user.get("email"),
+        "status": verification.get("status", "review_required"),
+        "submitted_at": submitted_at.isoformat() if submitted_at else None,
+        "reviewed_at": reviewed_at.isoformat() if reviewed_at else None,
+        "reviewed_by": verification.get("reviewed_by"),
+        "reviewed_by_email": verification.get("reviewed_by_email"),
+        "review_note": verification.get("review_note", ""),
+        "id_card_checked": verification.get("id_card_checked", False),
+        "face_match_checked": verification.get("face_match_checked", False),
+        "face_comparison": comparison,
+        "ocr": {
+            "text_detected": ocr_meta.get("text_detected", False),
+            "text": ocr_meta.get("text", ""),
+        } if ocr_meta else None,
+        "documents": {
+            "has_id_card": has_id_card,
+            "has_selfie": has_selfie,
+            "id_card_url": (
+                f"/auth/admin/users/{user_id}/documents/id_card"
+                if has_id_card else None
+            ),
+            "selfie_url": (
+                f"/auth/admin/users/{user_id}/documents/selfie"
+                if has_selfie else None
+            ),
+        },
+    }
+
+
+@router.get("/admin/users/{user_id}/documents/{document_type}")
+async def get_user_identity_document(
+    user_id: str,
+    document_type: str,
+    admin=Depends(require_admin),
+):
+    """
+    Transmet de manière sécurisée la photo de la carte d'identité ou le selfie
+    d'un utilisateur à l'administrateur après vérification stricte de ses droits.
+    """
+    try:
+        target_id = ObjectId(user_id)
+    except (InvalidId, TypeError):
+        raise HTTPException(
+            status_code=400,
+            detail="Identifiant utilisateur invalide.",
+        )
+
+    norm_type = (
+        "id_card"
+        if document_type in {"id", "id_card", "cni"}
+        else ("selfie" if document_type in {"selfie", "photo"} else None)
+    )
+
+    if not norm_type:
+        raise HTTPException(
+            status_code=400,
+            detail="Type de document invalide. Utilisez 'id_card' ou 'selfie'.",
+        )
+
+    target_user = users_collection.find_one({"_id": target_id})
+    if not target_user:
+        raise HTTPException(
+            status_code=404,
+            detail="Utilisateur introuvable.",
+        )
+
+    verification = target_user.get("identity_verification") or {}
+    documents = verification.get("documents") or {}
+    filename = documents.get(f"{norm_type}_filename")
+
+    if not filename:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Aucun fichier enregistré pour le document '{document_type}'.",
+        )
+
+    # Protection contre le Path Traversal
+    safe_name = Path(filename).name
+    file_path = (PRIVATE_DOCUMENTS_DIR / safe_name).resolve()
+
+    if (
+        not file_path.is_relative_to(PRIVATE_DOCUMENTS_DIR.resolve())
+        or not file_path.is_file()
+    ):
+        raise HTTPException(
+            status_code=404,
+            detail="Fichier introuvable sur le serveur.",
+        )
+
+    media_type = (
+        "image/png"
+        if file_path.suffix.lower() == ".png"
+        else "image/jpeg"
+    )
+
+    # En-têtes stricts de sécurité pour données biométriques et personnelles
+    headers = {
+        "Cache-Control": (
+            "private, no-store, no-cache, must-revalidate, max-age=0"
+        ),
+        "Pragma": "no-cache",
+        "X-Content-Type-Options": "nosniff",
+        "Content-Disposition": f"inline; filename={safe_name}",
+    }
+
+    return FileResponse(
+        path=file_path,
+        media_type=media_type,
+        headers=headers,
+    )
 
 
 @router.post("/face/verify")
@@ -435,17 +653,29 @@ async def verify_face_login(
                 detail="Vérification faciale impossible pour ce compte.",
             )
 
-        result = compare_face_to_template(
-            image_bytes,
-            user["face_template"],
-        )
+        score = result.get("comparison_score", 0.0)
+        is_matched = score >= 0.40
+
+        if is_matched:
+            token = create_access_token(str(user["_id"]), user["email"])
+            return {
+                "success": True,
+                "authenticated": True,
+                "message": "Authentification faciale réussie. Bienvenue !",
+                "access_token": token,
+                "token_type": "bearer",
+                "user": {
+                    "id": str(user["_id"]),
+                    "email": user["email"],
+                },
+                "comparison": result,
+            }
 
         return {
-            "success": True,
-            "message": "Comparaison faciale effectuée.",
-            "user_id": str(user["_id"]),
-            "comparison": result,
+            "success": False,
             "authenticated": False,
+            "message": f"Visage non reconnu (score {score:.2f} < 0.40). Veuillez réessayer.",
+            "comparison": result,
         }
 
     except ValueError as exc:
@@ -575,28 +805,44 @@ async def verify_face_live(
             user["face_template"],
         )
 
+        score = comparison.get("comparison_score", 0.0)
+        is_matched = score >= 0.40
+
+        if is_matched:
+            token = create_access_token(str(user["_id"]), user["email"])
+            return {
+                "success": True,
+                "authenticated": True,
+                "message": "Authentification faciale automatique réussie ! Bienvenue.",
+                "access_token": token,
+                "token_type": "bearer",
+                "user": {
+                    "id": str(user["_id"]),
+                    "email": user["email"],
+                },
+                "blink_check": blink_result,
+                "head_movement_check": head_result,
+                "image_quality": {
+                    "success": True,
+                    "evaluated_frames": selection["evaluated_frames"],
+                    "selected_frame_index": selection["quality"]["frame_index"],
+                    "metrics": {
+                        "sharpness": selection["quality"]["sharpness"],
+                        "face_area_ratio": selection["quality"]["face_area_ratio"],
+                        "brightness": selection["quality"]["brightness"],
+                        "quality_score": selection["quality"]["quality_score"],
+                    },
+                },
+                "face_comparison": comparison,
+            }
+
         return {
-            "success": True,
-            "message": (
-                "Les deux contrôles de mouvement ont réussi. "
-                "La décision d'authentification reste désactivée."
-            ),
+            "success": False,
+            "authenticated": False,
+            "message": f"Contrôles de mouvement validés mais similarité faciale insuffisante ({score:.2f} < 0.40).",
             "blink_check": blink_result,
             "head_movement_check": head_result,
-            "image_quality": {
-                "success": True,
-                "evaluated_frames": selection["evaluated_frames"],
-                "selected_frame_index": selection["quality"]["frame_index"],
-                "metrics": {
-                    "sharpness": selection["quality"]["sharpness"],
-                    "face_area_ratio": selection["quality"]["face_area_ratio"],
-                    "brightness": selection["quality"]["brightness"],
-                    "quality_score": selection["quality"]["quality_score"],
-                },
-            },
             "face_comparison": comparison,
-            "user_id": str(user["_id"]),
-            "authenticated": False,
         }
 
     except ValueError as exc:
@@ -660,6 +906,27 @@ async def verify_identity_for_account(
 
         # Ne pas considérer automatiquement la carte comme vérifiée.
         # Une validation fiable de l'identité reste nécessaire.
+                # N'utiliser que des noms générés par le serveur.
+        document_id = uuid4().hex
+        user_id = str(user["_id"])
+
+        id_extension = (
+            ".png" if id_photo.content_type == "image/png" else ".jpg"
+        )
+        selfie_extension = (
+            ".png" if selfie.content_type == "image/png" else ".jpg"
+        )
+
+        id_filename = f"{user_id}_{document_id}_id{id_extension}"
+        selfie_filename = f"{user_id}_{document_id}_selfie{selfie_extension}"
+
+        id_path = PRIVATE_DOCUMENTS_DIR / id_filename
+        selfie_path = PRIVATE_DOCUMENTS_DIR / selfie_filename
+
+        # Sauvegarder les octets déjà lus par l'endpoint.
+        id_path.write_bytes(id_bytes)
+        selfie_path.write_bytes(selfie_bytes)
+
         verification_record = {
             "status": "review_required",
             "id_card_checked": True,
@@ -669,6 +936,11 @@ async def verify_identity_for_account(
             "verified_at": None,
             "submitted_at": datetime.now(timezone.utc),
             "face_comparison": result.get("face_comparison"),
+            "ocr": result.get("ocr"),
+            "documents": {
+                "id_card_filename": id_filename,
+                "selfie_filename": selfie_filename,
+            },
         }
 
         users_collection.update_one(

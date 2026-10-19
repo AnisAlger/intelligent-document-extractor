@@ -5,6 +5,7 @@ from app.ocr import (
 )
 from app.id_card_verification import verify_id_card_and_selfie
 from app.auth_routes import router as auth_router
+from app.chat_routes import router as chat_router
 import tempfile
 from app.liveness_detection import analyze_blink_sequence
 from pathlib import Path
@@ -32,6 +33,7 @@ app = FastAPI(
     version="1.0.0"
 )
 app.include_router(auth_router)
+app.include_router(chat_router)
 
 app.add_middleware(
     CORSMiddleware,
