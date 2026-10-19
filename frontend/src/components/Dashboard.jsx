@@ -48,8 +48,8 @@ function Dashboard() {
       setError("");
 
       const [dashboardResponse, invoicesResponse] = await Promise.all([
-        fetch("http://127.0.0.1:8000/dashboard"),
-        fetch("http://127.0.0.1:8000/invoices"),
+        fetch("https://intelligent-document-extractor-api.onrender.com/dashboard"),
+        fetch("https://intelligent-document-extractor-api.onrender.com/invoices"),
       ]);
 
       const dashboardData = await dashboardResponse.json();

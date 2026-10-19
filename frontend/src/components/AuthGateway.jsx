@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import "./AuthGateway.css";
 
 export default function AuthGateway({
-  apiUrl = "http://127.0.0.1:8000",
+  apiUrl = "https://intelligent-document-extractor-api.onrender.com",
   onLoginSuccess,
 }) {
   const [tab, setTab] = useState("face"); // "face" | "password" | "register"
@@ -149,7 +149,7 @@ export default function AuthGateway({
       } else {
         setFacialError(
           data.message ||
-            "Visage non reconnu ou contrôles de vivacité non concluants. Veuillez réessayer."
+          "Visage non reconnu ou contrôles de vivacité non concluants. Veuillez réessayer."
         );
       }
     } catch (err) {
@@ -354,9 +354,8 @@ export default function AuthGateway({
 
               {facialStatusText && !facialError && (
                 <div
-                  className={`auth-alert-message ${
-                    facialSuccess ? "success" : "info"
-                  }`}
+                  className={`auth-alert-message ${facialSuccess ? "success" : "info"
+                    }`}
                 >
                   {facialStatusText}
                 </div>

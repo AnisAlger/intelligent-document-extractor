@@ -19,7 +19,7 @@ export default function AdminDocumentReview({
   reviews = [],
   token = "",
   adminUser = null,
-  apiUrl = "http://127.0.0.1:8000",
+  apiUrl = "https://intelligent-document-extractor-api.onrender.com",
   statusFilter = "review_required",
   onFilterChange,
   onRefresh,
@@ -124,7 +124,7 @@ export default function AdminDocumentReview({
           const errData = await idRes.json().catch(() => ({}));
           throw new Error(
             errData.detail ||
-              `Impossible de récupérer la carte d'identité (HTTP ${idRes.status})`
+            `Impossible de récupérer la carte d'identité (HTTP ${idRes.status})`
           );
         }
         const idBlob = await idRes.blob();
@@ -144,7 +144,7 @@ export default function AdminDocumentReview({
           const errData = await selfieRes.json().catch(() => ({}));
           throw new Error(
             errData.detail ||
-              `Impossible de récupérer le selfie (HTTP ${selfieRes.status})`
+            `Impossible de récupérer le selfie (HTTP ${selfieRes.status})`
           );
         }
         const selfieBlob = await selfieRes.blob();
@@ -192,8 +192,7 @@ export default function AdminDocumentReview({
     try {
       await onDecideReview(selectedReview, decisionStatus, reviewNote);
       setFeedbackMessage(
-        `✅ Décision enregistrée : ${
-          decisionStatus === "verified" ? "Identité Validée" : "Identité Rejetée"
+        `✅ Décision enregistrée : ${decisionStatus === "verified" ? "Identité Validée" : "Identité Rejetée"
         } pour ${selectedReview.email}.`
       );
       setFeedbackIsError(false);
@@ -267,9 +266,8 @@ export default function AdminDocumentReview({
 
         <button
           type="button"
-          className={`filter-pill ${
-            statusFilter === "review_required" ? "active" : ""
-          }`}
+          className={`filter-pill ${statusFilter === "review_required" ? "active" : ""
+            }`}
           onClick={() => onFilterChange("review_required")}
         >
           En attente d'examen
@@ -280,9 +278,8 @@ export default function AdminDocumentReview({
 
         <button
           type="button"
-          className={`filter-pill ${
-            statusFilter === "all" ? "active" : ""
-          }`}
+          className={`filter-pill ${statusFilter === "all" ? "active" : ""
+            }`}
           onClick={() => onFilterChange("all")}
         >
           Tous les dossiers
@@ -291,9 +288,8 @@ export default function AdminDocumentReview({
 
         <button
           type="button"
-          className={`filter-pill ${
-            statusFilter === "verified" ? "active" : ""
-          }`}
+          className={`filter-pill ${statusFilter === "verified" ? "active" : ""
+            }`}
           onClick={() => onFilterChange("verified")}
         >
           Validées
@@ -304,9 +300,8 @@ export default function AdminDocumentReview({
 
         <button
           type="button"
-          className={`filter-pill ${
-            statusFilter === "rejected" ? "active" : ""
-          }`}
+          className={`filter-pill ${statusFilter === "rejected" ? "active" : ""
+            }`}
           onClick={() => onFilterChange("rejected")}
         >
           Rejetées
@@ -829,7 +824,7 @@ export default function AdminDocumentReview({
                   </span>
                   <span className="score-value" style={{ fontSize: "1rem" }}>
                     {selectedReview.comparison_score !== undefined &&
-                    selectedReview.comparison_score !== null
+                      selectedReview.comparison_score !== null
                       ? Number(selectedReview.comparison_score).toFixed(4)
                       : "Non disponible"}
                     {selectedReview.score_type ? ` (${selectedReview.score_type})` : ""}
@@ -839,13 +834,12 @@ export default function AdminDocumentReview({
                 {/* Score gauge meter */}
                 <div className="score-meter-bar-container">
                   <div
-                    className={`score-meter-bar-fill ${
-                      (selectedReview.comparison_score || 0) >= 0.6
+                    className={`score-meter-bar-fill ${(selectedReview.comparison_score || 0) >= 0.6
                         ? "high"
                         : (selectedReview.comparison_score || 0) >= 0.4
-                        ? "medium"
-                        : "low"
-                    }`}
+                          ? "medium"
+                          : "low"
+                      }`}
                     style={{
                       width: `${Math.min(
                         100,
@@ -889,9 +883,8 @@ export default function AdminDocumentReview({
                       <button
                         type="button"
                         key={`val-${idx}`}
-                        className={`preset-note-pill ${
-                          reviewNote === note ? "active" : ""
-                        }`}
+                        className={`preset-note-pill ${reviewNote === note ? "active" : ""
+                          }`}
                         onClick={() => setReviewNote(note)}
                       >
                         {note}
@@ -901,9 +894,8 @@ export default function AdminDocumentReview({
                       <button
                         type="button"
                         key={`rej-${idx}`}
-                        className={`preset-note-pill ${
-                          reviewNote === note ? "active" : ""
-                        }`}
+                        className={`preset-note-pill ${reviewNote === note ? "active" : ""
+                          }`}
                         onClick={() => setReviewNote(note)}
                       >
                         {note}

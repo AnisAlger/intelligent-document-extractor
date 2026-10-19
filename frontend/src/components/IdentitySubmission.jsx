@@ -4,7 +4,7 @@ import "./IdentityVerification.css";
 const MAX_SIZE = 8 * 1024 * 1024;
 
 export default function IdentitySubmission({
-  apiUrl = "http://127.0.0.1:8000",
+  apiUrl = "https://intelligent-document-extractor-api.onrender.com",
   userToken = "",
   onSubmissionSuccess,
 }) {

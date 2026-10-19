@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import "./ChatWidget.css";
 
-const API_URL = "http://127.0.0.1:8000";
+const API_URL = "https://intelligent-document-extractor-api.onrender.com";
 
 const QUICK_QUESTIONS = [
   "Comment extraire une facture ?",
@@ -293,8 +293,8 @@ export default function ChatWidget({ token, isAdmin }) {
                       {ttsLoading && playingMsgIndex === idx
                         ? "⏳"
                         : playingMsgIndex === idx
-                        ? "⏹️"
-                        : "🔊"}
+                          ? "⏹️"
+                          : "🔊"}
                     </button>
                   )}
                 </div>

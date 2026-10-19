@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import "./IdentityVerification.css";
 
-const API_URL = "http://127.0.0.1:8000";
+const API_URL = "https://intelligent-document-extractor-api.onrender.com";
 const MAX_SIZE = 8 * 1024 * 1024;
 
 function IdentityVerification() {
@@ -82,7 +82,7 @@ function IdentityVerification() {
     } catch (err) {
       setError(
         err.message ||
-          "Impossible de contacter le serveur. Vérifiez que FastAPI fonctionne."
+        "Impossible de contacter le serveur. Vérifiez que FastAPI fonctionne."
       );
     } finally {
       setLoading(false);
