@@ -96,8 +96,10 @@ TEXTE OCR :
 {text}
 """
 
+    model_name = os.getenv("OPENROUTER_MODEL", "openai/gpt-3.5-turbo-16k")
+
     response = client.chat.completions.create(
-        model="openai/gpt-3.5-turbo",
+        model=model_name,
         messages=[
             {
                 "role": "system",
@@ -113,7 +115,8 @@ TEXTE OCR :
         ],
         response_format={
             "type": "json_object"
-        }
+        },
+        max_tokens=1500
     )
 
     result = response.choices[0].message.content
