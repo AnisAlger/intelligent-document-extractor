@@ -678,10 +678,17 @@ async def verify_face_login(
             "comparison": result,
         }
 
+    except HTTPException:
+        raise
     except ValueError as exc:
         raise HTTPException(
             status_code=400,
             detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erreur lors de l'enregistrement biométrique : {str(exc)}",
         ) from exc
 
     finally:
@@ -845,10 +852,17 @@ async def verify_face_live(
             "face_comparison": comparison,
         }
 
+    except HTTPException:
+        raise
     except ValueError as exc:
         raise HTTPException(
             status_code=400,
             detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erreur d'analyse biométrique faciale : {str(exc)}",
         ) from exc
 
     finally:
@@ -967,10 +981,17 @@ async def verify_identity_for_account(
             "analysis": result,
         }
 
+    except HTTPException:
+        raise
     except ValueError as exc:
         raise HTTPException(
             status_code=400,
             detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erreur lors de la vérification de pièce d'identité : {str(exc)}",
         ) from exc
 
     finally:

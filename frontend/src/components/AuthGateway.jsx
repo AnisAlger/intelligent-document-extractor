@@ -129,10 +129,19 @@ export default function AuthGateway({
         body: formData,
       });
 
-      const data = await response.json();
+      let data = null;
+      try {
+        data = await response.json();
+      } catch (parseErr) {
+        data = null;
+      }
 
       if (!response.ok) {
-        throw new Error(data.detail || "Échec de l'authentification faciale.");
+        throw new Error(
+          data?.detail ||
+          data?.message ||
+          `Erreur serveur (${response.status}) : Impossible de joindre le service biométrique.`
+        );
       }
 
       if (data.authenticated && data.access_token) {

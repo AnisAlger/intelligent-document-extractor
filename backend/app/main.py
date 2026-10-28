@@ -37,16 +37,43 @@ app.include_router(auth_router)
 app.include_router(chat_router)
 
 cors_origins_env = os.getenv("ALLOWED_ORIGINS", "")
-origins_list = [o.strip() for o in cors_origins_env.split(",") if o.strip()]
+origins_list = [o.strip().rstrip("/") for o in cors_origins_env.split(",") if o.strip()]
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins_list if origins_list else ["http://localhost:5173", "http://127.0.0.1:5173"],
-    allow_origin_regex=None if origins_list else r"https?://.*",
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+if origins_list:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=origins_list + [
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+        ],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+else:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origin_regex=r"https?://.*",
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    import logging
+    logging.exception(f"Unhandled exception on {request.url.path}: {exc}")
+    from fastapi.responses import JSONResponse
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": f"Erreur interne du serveur : {str(exc)}",
+            "path": str(request.url.path),
+        },
+    )
 
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)

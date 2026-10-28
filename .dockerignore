@@ -1,0 +1,13 @@
+frontend/
+backend/venv/
+backend/.venv/
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+.git/
+.gitignore
+backend/uploads/
+backend/private_identity_documents/
+**/.env
+

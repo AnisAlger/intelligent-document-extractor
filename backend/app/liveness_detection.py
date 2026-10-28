@@ -190,16 +190,14 @@ def analyze_head_movement_sequence(frames: list[bytes]) -> dict:
     if len(frames) < 5:
         raise ValueError("Au moins 5 images sont nécessaires.")
 
-    model_path = (
-        Path(__file__).parent
-        / "models"
-        / "face"
-        / "face_landmarker.task"
-    )
+    if not MODEL_PATH.is_file():
+        raise RuntimeError(
+            f"Modèle Face Landmarker introuvable : {MODEL_PATH}"
+        )
 
     options = mp.tasks.vision.FaceLandmarkerOptions(
         base_options=mp.tasks.BaseOptions(
-            model_asset_path=str(model_path.resolve())
+            model_asset_path=str(MODEL_PATH)
         ),
         running_mode=mp.tasks.vision.RunningMode.IMAGE,
         num_faces=1,
@@ -287,16 +285,14 @@ def select_best_face_frame(frames: list[bytes]) -> dict:
     if not frames:
         raise ValueError("Aucune image n'a été fournie.")
 
-    model_path = (
-        Path(__file__).parent
-        / "models"
-        / "face"
-        / "face_landmarker.task"
-    )
+    if not MODEL_PATH.is_file():
+        raise RuntimeError(
+            f"Modèle Face Landmarker introuvable : {MODEL_PATH}"
+        )
 
     options = mp.tasks.vision.FaceLandmarkerOptions(
         base_options=mp.tasks.BaseOptions(
-            model_asset_path=str(model_path.resolve())
+            model_asset_path=str(MODEL_PATH)
         ),
         running_mode=mp.tasks.vision.RunningMode.IMAGE,
         num_faces=1,

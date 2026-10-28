@@ -6,15 +6,19 @@ from pdf2image import convert_from_path
 import cv2
 import numpy as np
 
+import shutil
+
 # Configuration Tesseract (compatible Windows local et Linux/Render)
 WINDOWS_TESSERACT = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 TESSERACT_ENV = os.getenv("TESSERACT_CMD")
 
-if TESSERACT_ENV:
+if TESSERACT_ENV and (os.path.exists(TESSERACT_ENV) or shutil.which(TESSERACT_ENV)):
     pytesseract.pytesseract.tesseract_cmd = TESSERACT_ENV
 elif platform.system() == "Windows" and os.path.exists(WINDOWS_TESSERACT):
     pytesseract.pytesseract.tesseract_cmd = WINDOWS_TESSERACT
-# Sur Linux (ex: Render), pytesseract utilisera automatiquement le binaire 'tesseract' dans le PATH
+elif shutil.which("tesseract"):
+    pytesseract.pytesseract.tesseract_cmd = shutil.which("tesseract")
+# Sur Linux (ex: Render / conteneur Docker), pytesseract utilisera le binaire tesseract présent dans le PATH
 
 # Configuration Poppler (compatible Windows local et Linux/Render)
 WINDOWS_POPPLER = r"C:\Users\ISSER TECH\Downloads\poppler-26.09.0\Library\bin"
