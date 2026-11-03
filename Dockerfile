@@ -14,6 +14,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 \
     libglib2.0-0 \
     libgomp1 \
+    libegl1 \
+    libgles2 \
+    libsm6 \
+    libxext6 \
+    libxrender1 \
     curl \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
@@ -32,4 +37,3 @@ ENV PORT=10000
 EXPOSE 10000
 
 CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-10000}"]
-

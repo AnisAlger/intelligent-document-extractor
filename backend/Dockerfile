@@ -10,7 +10,7 @@ ENV PYTHONUNBUFFERED=1
 # 1. Installation des dépendances système indispensables :
 # - tesseract-ocr, tesseract-ocr-fra, tesseract-ocr-eng : Moteur OCR et dictionnaires
 # - poppler-utils : pdftoppm pour la pixellisation haute résolution PDF (pdf2image)
-# - libgl1, libglib2.0-0, libgomp1 : Bibliothèques graphiques pour OpenCV et MediaPipe
+# - libgl1, libglib2.0-0, libgomp1, libegl1, libgles2 : Bibliothèques graphiques pour OpenCV et MediaPipe
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr \
     tesseract-ocr-fra \
@@ -19,6 +19,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 \
     libglib2.0-0 \
     libgomp1 \
+    libegl1 \
+    libgles2 \
+    libsm6 \
+    libxext6 \
+    libxrender1 \
     curl \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
@@ -42,4 +47,3 @@ EXPOSE 10000
 
 # 6. Démarrage du serveur Uvicorn
 CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-10000}"]
-
