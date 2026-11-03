@@ -89,7 +89,7 @@ export default function AuthGateway({
 
     setFacialLoading(true);
     setFacialError("");
-    setFacialStatusText("Analyse en cours : gardez votre visage dans le cadre et clignez naturellement des yeux...");
+    setFacialStatusText("Analyse en cours : fixez bien la caméra et clignez franchement des yeux...");
 
     try {
       const video = videoRef.current;
@@ -101,7 +101,7 @@ export default function AuthGateway({
 
       const frames = [];
 
-      for (let i = 0; i < 15; i++) {
+      for (let i = 0; i < 18; i++) {
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
         const blob = await new Promise((resolve) =>
           canvas.toBlob(resolve, "image/jpeg", 0.85)
@@ -112,10 +112,10 @@ export default function AuthGateway({
         }
 
         frames.push(blob);
-        await new Promise((resolve) => setTimeout(resolve, 150));
+        await new Promise((resolve) => setTimeout(resolve, 120));
       }
 
-      setFacialStatusText("Vérification du clignement et comparaison biométrique...");
+      setFacialStatusText("Vérification biométrique du vivant en cours...");
 
       const formData = new FormData();
       formData.append("email", faceEmail.trim());

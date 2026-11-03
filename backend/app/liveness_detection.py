@@ -154,6 +154,19 @@ def analyze_blink_sequence(
         elif state == "closed" and saw_open:
             saw_closed = True
 
+    # Détection adaptative complémentaire basée sur la variation relative du ratio d'ouverture (EAR)
+    if not blink_detected and len(ratios) >= 5:
+        max_ear = max(ratios)
+        min_ear = min(ratios)
+        min_idx = ratios.index(min_ear)
+        # Le creux du clignement ne doit pas être sur la première ou dernière frame
+        if 0 < min_idx < len(ratios) - 1:
+            diff = max_ear - min_ear
+            drop_ratio = (diff / max_ear) if max_ear > 0 else 0
+            # Si l'œil se ferme d'au moins 18% et d'un delta absolu de 0.035
+            if diff >= 0.035 and drop_ratio >= 0.18:
+                blink_detected = True
+
     return {
         "success": True,
         "blink_detected": blink_detected,
@@ -259,8 +272,8 @@ def analyze_head_movement_sequence(frames: list[bytes]) -> dict:
 
     movement = max(positions) - min(positions)
 
-    # Seuil initial à tester avec plusieurs personnes et caméras.
-    detected = movement >= 0.18
+    # Seuil de détection du mouvement naturel de la tête
+    detected = movement >= 0.12
 
     return {
         "success": True,

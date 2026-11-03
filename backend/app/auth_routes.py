@@ -755,13 +755,14 @@ async def verify_face_live(
             and head_result.get("head_movement_detected") is True
         )
 
-        # Les deux contrôles doivent réussir avant la comparaison faciale.
-        if not (blink_ok and head_ok):
+        # Au moins l'un des contrôles de vivacité doit réussir (clignement ou mouvement de tête)
+        liveness_ok = blink_ok or head_ok
+
+        if not liveness_ok:
             return {
                 "success": True,
                 "message": (
-                    "Les contrôles ne sont pas tous concluants. "
-                    "Recommencez la capture."
+                    "Contrôle du vivant non validé : veuillez bien fixer la caméra et cligner franchement des yeux ou tourner légèrement la tête."
                 ),
                 "blink_check": blink_result,
                 "head_movement_check": head_result,
